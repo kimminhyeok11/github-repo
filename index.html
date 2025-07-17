@@ -53,20 +53,38 @@
             <textarea id="html-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 300px;" placeholder="배포할 HTML 코드를 여기에 붙여넣으세요."></textarea>
         </div>
 
+        <div class="panel rounded-xl p-6 flex flex-col">
+            <label for="js-code" class="block text-lg font-semibold text-white mb-4">4. JavaScript 코드 (선택 사항)</label>
+            <textarea id="js-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 300px;" placeholder="배포할 JavaScript 코드를 여기에 붙여넣으세요."></textarea>
+        </div>
+
         <div class="panel rounded-xl p-6 space-y-4">
-            <label class="text-lg font-semibold text-white">4. 실행</label>
+            <label class="text-lg font-semibold text-white">5. 실행</label>
             <div class="grid grid-cols-2 gap-4">
                 <button id="reset-button" class="btn btn-secondary">초기화</button>
                 <button id="deploy-button" class="btn btn-primary">배포 실행</button>
             </div>
             <div id="status-section" class="hidden min-h-[100px] pt-4"></div>
         </div>
-        
+
         <div class="space-y-4">
             <div class="panel rounded-xl">
-                 <details>
-                    <summary class="p-6 cursor-pointer flex justify-between items-center"><h2 class="text-lg font-semibold text-white">이 도구는 어떻게 작동하나요?</h2><svg class="w-6 h-6 text-slate-400 transition-transform transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg></summary>
-                    <div class="px-6 pb-6 border-t border-slate-700"><p class="text-slate-400 mt-4">이 도구는 GitHub의 공식 API를 사용하여, 가장 안정적인 방식으로 아래 4단계 배포 과정을 자동으로 처리합니다.</p><ul class="list-decimal list-inside space-y-3 mt-4 text-slate-300"><li class="font-bold text-sky-300"><strong>[개선] 저장소 생성 및 초기화:</strong> 텅 빈 저장소가 아닌, `README.md` 파일이 포함된 '준비된' 저장소를 생성하여 타이밍 오류를 원천 차단합니다.</li><li class="font-bold text-sky-300"><strong>[개선] 파일 직접 업로드:</strong> 복잡한 절차 대신, 가장 간단하고 확실한 `PUT /contents` API를 사용하여 `index.html` 파일을 저장소에 직접 생성합니다.</li><li><strong>Pages 기능 활성화:</strong> 업로드된 저장소의 GitHub Pages 호스팅 기능을 켭니다.</li><li><strong>URL 확인:</strong> GitHub 서버의 빌드가 완료되고, 실제 웹사이트 주소가 활성화될 때까지 기다린 후 최종 결과를 보여줍니다.</li></ul></div>
+                <details>
+                    <summary class="p-6 cursor-pointer flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-white">이 도구는 어떻게 작동하나요?</h2>
+                        <svg class="w-6 h-6 text-slate-400 transition-transform transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <div class="px-6 pb-6 border-t border-slate-700">
+                        <p class="text-slate-400 mt-4">이 도구는 GitHub의 공식 API를 사용하여, 가장 안정적인 방식으로 아래 5단계 배포 과정을 자동으로 처리합니다.</p>
+                        <ul class="list-decimal list-inside space-y-3 mt-4 text-slate-300">
+                            <li class="font-bold text-sky-300"><strong>[개선] 저장소 생성 및 초기화:</strong> 텅 빈 저장소가 아닌, `README.md` 파일이 포함된 '준비된' 저장소를 생성하여 타이밍 오류를 원천 차단합니다.</li>
+                            <li class="font-bold text-sky-300"><strong>[개선] 파일 직접 업로드:</strong> 복잡한 절차 대신, 가장 간단하고 확실한 `PUT /contents` API를 사용하여 `index.html` 및 `script.js` 파일을 저장소에 직접 생성합니다.</li>
+                            <li><strong>Pages 기능 활성화:</strong> 업로드된 저장소의 GitHub Pages 호스팅 기능을 켭니다.</li>
+                            <li><strong>URL 확인:</strong> GitHub 서버의 빌드가 완료되고, 실제 웹사이트 주소가 활성화될 때까지 기다린 후 최종 결과를 보여줍니다.</li>
+                        </ul>
+                    </div>
                 </details>
             </div>
         </div>
@@ -106,7 +124,7 @@
                 return response.status === 204 ? null : await response.json();
             },
             createRepo: (t, name, desc) => githubApi.request('/user/repos', t, { method: 'POST', body: JSON.stringify({ name, description: desc || '', private: false, auto_init: true }) }),
-            createFile: (t, owner, repo, content) => githubApi.request(`/repos/${owner}/${repo}/contents/index.html`, t, { method: 'PUT', body: JSON.stringify({ message: 'Create index.html', content: toBase64(content), branch: 'main' }) }),
+            createFile: (t, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, t, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content: toBase64(content), branch: 'main' }) }),
             enablePages: (t, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, t, { method: 'POST', body: JSON.stringify({ source: { branch: 'main', path: '/' } }) }),
             checkPagesStatus: (t, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, t),
         };
@@ -126,6 +144,7 @@
             document.getElementById('repo-name').value = `site-${Math.floor(Date.now() / 1000)}`;
             document.getElementById('repo-desc').value = "";
             document.getElementById('html-code').value = "";
+            document.getElementById('js-code').value = "";
             statusSection.classList.add('hidden');
             statusSection.innerHTML = '';
         }
@@ -137,13 +156,14 @@
             const repoName = document.getElementById('repo-name').value.trim();
             const repoDesc = document.getElementById('repo-desc').value.trim() || `Automated deployment`;
             const htmlCode = document.getElementById('html-code').value;
+            const jsCode = document.getElementById('js-code').value;
 
             if (!username || !token || !repoName || !htmlCode) {
                 updateStatusUI('error', { message: "GitHub 사용자 이름, 액세스 토큰, 저장소 이름, HTML 코드는 필수 입력 항목입니다." });
                 return;
             }
-             if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-                 updateStatusUI('error', { message: "올바른 형식의 GitHub 개인용 액세스 토큰(PAT)을 입력해주세요. 'ghp_' 또는 'github_pat_'로 시작해야 합니다." });
+            if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+                updateStatusUI('error', { message: "올바른 형식의 GitHub 개인용 액세스 토큰(PAT)을 입력해주세요. 'ghp_' 또는 'github_pat_'로 시작해야 합니다." });
                 return;
             }
 
@@ -158,7 +178,16 @@
                 await new Promise(resolve => setTimeout(resolve, 3000)); 
 
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
-                await githubApi.createFile(token, username, repoName, htmlCode);
+                // HTML 코드에 JavaScript 파일 참조 추가
+                const modifiedHtmlCode = jsCode ? 
+                    htmlCode.replace('</body>', '<script src="script.js"></script></body>') : 
+                    htmlCode;
+                await githubApi.createFile(token, username, repoName, 'index.html', modifiedHtmlCode);
+                
+                // JavaScript 코드가 있으면 script.js 파일 업로드
+                if (jsCode) {
+                    await githubApi.createFile(token, username, repoName, 'script.js', jsCode);
+                }
                 
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 await githubApi.enablePages(token, username, repoName);
@@ -185,7 +214,9 @@
                     try {
                         const status = await githubApi.checkPagesStatus(token, owner, repo);
                         if (status && status.status === 'built' && status.html_url) {
-                            clearInterval(interval); resolve(status.html_url); return;
+                            clearInterval(interval); 
+                            resolve(status.html_url); 
+                            return;
                         }
                     } catch(e) { /* 404 is expected while building */ }
                     
@@ -202,7 +233,7 @@
             if (isLoading) {
                 deployButton.innerHTML = `<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
             } else {
-                 deployButton.innerHTML = `배포 실행`;
+                deployButton.innerHTML = `배포 실행`;
             }
         }
         
@@ -218,15 +249,15 @@
                 <div class="space-y-3 mt-4 border-t border-slate-700 pt-4">
                     <div><label class="block text-xs font-medium text-slate-400">웹사이트 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="deployed-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${url}"><button onclick="copyToClipboard('deployed-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div>
                     <div><label class="block text-xs font-medium text-slate-400">GitHub 저장소 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="repo-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${repoUrl}"><button onclick="copyToClipboard('repo-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div>
-                    <a href="${url}" target="_blank" class="inline-block mt-2 text-indigo-400 hover:underline">새 탭에서 열기 &rarr;</a>
+                    <a href="${url}" target="_blank" class="inline-block mt-2 text-indigo-400 hover:underline">새 탭에서 열기 →</a>
                 </div>`;
 
             switch(type) {
                 case 'loading': content = `<div class="text-center space-y-3">${iconLoading}<p class="text-lg font-semibold text-white">${data.task}</p><p class="text-sm text-slate-400">(${data.current}/${data.total})</p></div>`; break;
                 case 'success': content = `<div class="text-center space-y-3">${iconSuccess}<h2 class="text-xl font-semibold text-white">배포 성공!</h2><p class="text-slate-400 text-sm">사이트가 성공적으로 게시되었습니다.</p></div>${linksHTML(data.url, `https://github.com/${data.username}/${data.repoName}`)}`; break;
                 case 'error':
-                     if (data.isTimeout) { content = `<div class="text-center space-y-3">${iconTimeout}<h2 class="text-xl font-semibold text-white">시간 초과</h2><p class="text-yellow-400 text-sm">${data.message}</p></div><div class="space-y-3 mt-4 border-t border-slate-700 pt-4"><div><label class="block text-xs font-medium text-slate-400">생성된 GitHub 저장소 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="repo-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${data.repoUrl}"><button onclick="copyToClipboard('repo-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div></div>`; } 
-                     else { content = `<div class="text-center space-y-3">${iconError}<h2 class="text-xl font-semibold text-white">오류 발생</h2><p class="text-red-400 text-sm">${data.message}</p></div>`; }
+                    if (data.isTimeout) { content = `<div class="text-center space-y-3">${iconTimeout}<h2 class="text-xl font-semibold text-white">시간 초과</h2><p class="text-yellow-400 text-sm">${data.message}</p></div><div class="space-y-3 mt-4 border-t border-slate-700 pt-4"><div><label class="block text-xs font-medium text-slate-400">생성된 GitHub 저장소 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="repo-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${data.repoUrl}"><button onclick="copyToClipboard('repo-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div></div>`; } 
+                    else { content = `<div class="text-center space-y-3">${iconError}<h2 class="text-xl font-semibold text-white">오류 발생</h2><p class="text-red-400 text-sm">${data.message}</p></div>`; }
                     break;
             }
             statusSection.innerHTML = content;
@@ -252,4 +283,3 @@
     </script>
 </body>
 </html>
-
