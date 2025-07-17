@@ -122,15 +122,15 @@
                 }
                 return response.status === 204 ? null : await response.json();
             },
-            createRepo: (t, name, desc) => githubApi.request('/user/repos', t, { method: 'POST', body: JSON.stringify({ name, description: desc || '', private: false, auto_init: true }) }),
-            createFile: (t, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, t, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content: toBase64(content), branch: 'main' }) }),
-            enablePages: (t, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, t, { method: 'POST', body: JSON.stringify({ source: { branch: 'main', path: '/' } }) }),
-            checkPagesStatus: (t, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, t),
+            createRepo: (token, name, desc) => githubApi.request('/user/repos', token, { method: 'POST', body: JSON.stringify({ name, description: desc || '', private: false, auto_init: true }) }),
+            createFile: (token, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, token, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content: toBase64(content), branch: 'main' }) }),
+            enablePages: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token, { method: 'POST', body: JSON.stringify({ source: { branch: 'main', path: '/' } }) }),
+            checkPagesStatus: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token)
         };
 
         // 페이지 로드 시 이벤트 리스너 설정
         document.addEventListener('DOMContentLoaded', () => {
-            handleReset(); 
+            handleReset();
             deployButton.addEventListener('click', handleDeploy);
             resetButton.addEventListener('click', handleReset);
             document.querySelectorAll('details').forEach(el => el.addEventListener('toggle', function() { this.querySelector('svg').classList.toggle('rotate-180'); }));
@@ -138,12 +138,12 @@
 
         // 입력 필드와 상태창을 초기화하는 함수
         function handleReset() {
-            document.getElementById('github-username').value = "";
-            document.getElementById('github-pat').value = "";
+            document.getElementById('github-username').value = '';
+            document.getElementById('github-pat').value = '';
             document.getElementById('repo-name').value = `site-${Math.floor(Date.now() / 1000)}`;
-            document.getElementById('repo-desc').value = "";
-            document.getElementById('html-code').value = "";
-            document.getElementById('js-code').value = "";
+            document.getElementById('repo-desc').value = '';
+            document.getElementById('html-code').value = '';
+            document.getElementById('js-code').value = '';
             statusSection.classList.add('hidden');
             statusSection.innerHTML = '';
         }
@@ -153,16 +153,16 @@
             const username = document.getElementById('github-username').value.trim();
             const token = document.getElementById('github-pat').value.trim();
             const repoName = document.getElementById('repo-name').value.trim();
-            const repoDesc = document.getElementById('repo-desc').value.trim() || `Automated deployment`;
+            const repoDesc = document.getElementById('repo-desc').value.trim() || 'Automated deployment';
             const htmlCode = document.getElementById('html-code').value;
             const jsCode = document.getElementById('js-code').value;
 
             if (!username || !token || !repoName || !htmlCode) {
-                updateStatusUI('error', { message: "GitHub 사용자 이름, 액세스 토큰, 저장소 이름, HTML 코드는 필수 입력 항목입니다." });
+                updateStatusUI('error', { message: 'GitHub 사용자 이름, 액세스 토큰, 저장소 이름, HTML 코드는 필수 입력 항목입니다.' });
                 return;
             }
             if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-                updateStatusUI('error', { message: "올바른 형식의 GitHub 개인용 액세스 토큰(PAT)을 입력해주세요. 'ghp_' 또는 'github_pat_'로 시작해야 합니다." });
+                updateStatusUI('error', { message: '올바른 형식의 GitHub 개인용 액세스 토큰(PAT)을 입력해주세요. \'ghp_\' 또는 \'github_pat_\'로 시작해야 합니다.' });
                 return;
             }
 
@@ -173,31 +173,28 @@
             try {
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 await githubApi.createRepo(token, repoName, repoDesc);
-                
-                await new Promise(resolve => setTimeout(resolve, 3000)); 
+
+                await new Promise(resolve => setTimeout(resolve, 3000));
 
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 // HTML 코드에 JavaScript 파일 참조 추가
-                const modifiedHtmlCode = jsCode ? 
-                    htmlCode.replace('</body>', '<script src="script.js"></script></body>') : 
-                    htmlCode;
+                const modifiedHtmlCode = jsCode ? htmlCode.replace('</body>', '<script src="script.js"></script></body>') : htmlCode;
                 await githubApi.createFile(token, username, repoName, 'index.html', modifiedHtmlCode);
-                
+
                 // JavaScript 코드가 있으면 script.js 파일 업로드
                 if (jsCode) {
                     await githubApi.createFile(token, username, repoName, 'script.js', jsCode);
                 }
-                
+
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 await githubApi.enablePages(token, username, repoName);
-                
+
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 const finalUrl = await pollForPagesUrl(token, username, repoName);
-                
-                updateStatusUI('success', { url: finalUrl, username, repoName });
 
+                updateStatusUI('success', { url: finalUrl, username, repoName });
             } catch (error) {
-                const errorMessage = error.isTimeout ? error.message : `[${steps[currentStep-1] || '시작'}] 단계 실패: ${error.message}`;
+                const errorMessage = error.isTimeout ? error.message : `[${steps[currentStep - 1] || '시작'}] 단계 실패: ${error.message}`;
                 updateStatusUI('error', { message: errorMessage, isTimeout: error.isTimeout, repoUrl: `https://github.com/${username}/${repoName}` });
             } finally {
                 setButtonLoading(false);
@@ -213,20 +210,20 @@
                     try {
                         const status = await githubApi.checkPagesStatus(token, owner, repo);
                         if (status && status.status === 'built' && status.html_url) {
-                            clearInterval(interval); 
-                            resolve(status.html_url); 
+                            clearInterval(interval);
+                            resolve(status.html_url);
                             return;
                         }
-                    } catch(e) { /* 404 is expected while building */ }
-                    
+                    } catch (e) { /* 404 is expected while building */ }
+
                     if (attempt >= maxAttempts) {
                         clearInterval(interval);
-                        reject({ message: "시간 초과. Pages 빌드가 지연되고 있습니다. 잠시 후 GitHub 저장소에서 직접 확인해주세요.", isTimeout: true });
+                        reject({ message: '시간 초과. Pages 빌드가 지연되고 있습니다. 잠시 후 GitHub 저장소에서 직접 확인해주세요.', isTimeout: true });
                     }
                 }, 3000);
             });
         }
-        
+
         function setButtonLoading(isLoading) {
             deployButton.disabled = isLoading;
             if (isLoading) {
@@ -235,7 +232,7 @@
                 deployButton.innerHTML = `배포 실행`;
             }
         }
-        
+
         function updateStatusUI(type, data) {
             statusSection.classList.remove('hidden');
             let content = '';
