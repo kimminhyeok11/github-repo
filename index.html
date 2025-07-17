@@ -17,15 +17,17 @@
         .btn-primary { background-image: linear-gradient(to right, #4f46e5, #7c3aed); box-shadow: 0 4px 15px 0 rgba(79, 70, 229, 0.3); }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px 0 rgba(79, 70, 229, 0.4); }
         .btn-primary:disabled { background-image: none; background-color: #475569; cursor: not-allowed; transform: none; box-shadow: none; }
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
+        /* 파일 입력 필드 스타일 */
+        input[type="file"]::file-selector-button {
+            @apply bg-slate-600 text-slate-300 font-semibold border-0 rounded-md px-4 py-2 mr-4 cursor-pointer hover:bg-slate-500 transition-colors;
+        }
     </style>
 </head>
 <body class="text-slate-300">
     <div class="w-full max-w-4xl mx-auto p-4 space-y-6">
         <header class="text-center py-4">
             <h1 class="text-3xl md:text-4xl font-bold text-white">GitHub Pages Deployer</h1>
-            <p class="text-slate-400 mt-2">고급 파비콘 생성을 지원하는 정식 호스팅 자동화 도구</p>
+            <p class="text-slate-400 mt-2">이미지 파일 업로드를 지원하는 최종 버전</p>
         </header>
 
         <div class="panel rounded-xl p-6 space-y-6">
@@ -39,14 +41,9 @@
             </div>
             <hr class="border-slate-700">
             <div class="space-y-4">
-                <label for="repo-name" class="text-lg font-semibold text-white">2. 저장소 및 파비콘 정보</label>
+                <label class="text-lg font-semibold text-white">2. 저장소 정보</label>
                 <input type="text" id="repo-name" class="form-input rounded-md w-full" placeholder="새 저장소 이름">
                 <input type="text" id="repo-desc" class="form-input rounded-md w-full mt-4" placeholder="저장소 설명 (선택 사항)">
-                <!-- [추가] 파비콘 배경색 입력 필드 -->
-                <div class="pt-2">
-                    <label for="favicon-bg-color" class="block text-sm font-medium text-slate-400">파비콘 배경색 (선택 사항)</label>
-                    <input type="text" id="favicon-bg-color" class="form-input rounded-md w-full mt-1 text-sm" placeholder="색상 코드(예: #111827) 또는 색상 이름(예: black)">
-                </div>
             </div>
         </div>
 
@@ -57,11 +54,17 @@
 
         <div class="panel rounded-xl p-6 flex flex-col">
             <label for="js-code" class="block text-lg font-semibold text-white mb-4">4. JavaScript 코드 (선택 사항)</label>
-            <textarea id="js-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 200px;" placeholder="배포할 JavaScript 코드를 여기에 붙여넣으세요."></textarea>
+            <textarea id="js-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 150px;" placeholder="배포할 JavaScript 코드를 여기에 붙여넣으세요."></textarea>
+        </div>
+
+        <!-- [수정] 파비콘 이미지 파일 업로드 섹션 -->
+        <div class="panel rounded-xl p-6 flex flex-col">
+            <label for="favicon-file" class="block text-lg font-semibold text-white mb-4">5. 파비콘 이미지 업로드 (선택 사항)</label>
+            <input type="file" id="favicon-file" class="form-input rounded-md w-full text-sm" accept="image/*">
         </div>
 
         <div class="panel rounded-xl p-6 space-y-4">
-            <label class="text-lg font-semibold text-white">5. 실행</label>
+            <label class="text-lg font-semibold text-white">6. 실행</label>
             <div class="grid grid-cols-2 gap-4">
                 <button id="reset-button" class="flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-base font-bold w-full transition-all duration-300 ease-in-out bg-slate-700 text-slate-300 hover:bg-slate-600">초기화</button>
                 <button id="deploy-button" class="btn-primary flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-base font-bold w-full transition-all duration-300 ease-in-out">배포 실행</button>
@@ -75,26 +78,18 @@
         const resetButton = document.getElementById('reset-button');
         const statusSection = document.getElementById('status-section');
 
-        function toBase64(str) {
-            return btoa(unescape(encodeURIComponent(str)));
-        }
-
-        // [수정] 첫 단어와 배경색을 사용해 SVG 파비콘을 생성하는 함수
-        function generateFaviconSVG(repoName, customBgColor) {
-            const defaultBgColor = '#4f46e5';
-            const textColor = '#ffffff';
-            
-            // 저장소 이름에서 첫 단어 추출 (-, _ 기준으로 분리)
-            const firstWord = (repoName || '').split(/[-_]/)[0] || 'Site';
-            
-            // 사용자 지정 배경색 또는 기본색 사용
-            const bgColor = customBgColor || defaultBgColor;
-
-            // 글자 길이에 맞춰 자동으로 크기 조절되도록 textLength 속성 사용
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
-                      <rect width="100" height="100" rx="20" fill="${bgColor}"></rect>
-                      <text x="50" y="55" font-size="50" font-family="sans-serif" fill="${textColor}" text-anchor="middle" dominant-baseline="middle" textLength="90" lengthAdjust="spacingAndGlyphs">${firstWord}</text>
-                    </svg>`;
+        // [수정] 파일 리더를 Promise로 감싸 비동기 처리를 쉽게 함
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // 데이터 URI에서 Base64 부분만 추출 (e.g., "data:image/png;base64,iVBOR...")
+                    const base64Content = reader.result.split(',')[1];
+                    resolve(base64Content);
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
         }
 
         const githubApi = {
@@ -105,13 +100,12 @@
                 });
                 if (!response.ok) {
                     const errorData = await response.json();
-                    const message = errorData.message || 'API 요청 실패: ' + response.status;
-                    throw new Error(message);
+                    throw new Error(errorData.message || 'API 요청 실패');
                 }
                 return response.status === 204 ? null : await response.json();
             },
-            createRepo: (token, name, desc) => githubApi.request('/user/repos', token, { method: 'POST', body: JSON.stringify({ name: name, description: desc || '', private: false, auto_init: true }) }),
-            createFile: (token, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, token, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content: toBase64(content) }) }),
+            createRepo: (token, name, desc) => githubApi.request('/user/repos', token, { method: 'POST', body: JSON.stringify({ name, description: desc || '' }) }),
+            createFile: (token, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, token, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content }) }),
             enablePages: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token, { method: 'POST', body: JSON.stringify({ source: { branch: 'main', path: '/' } }) }),
             checkPagesStatus: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token)
         };
@@ -127,9 +121,9 @@
             document.getElementById('github-pat').value = '';
             document.getElementById('repo-name').value = 'site-' + Math.floor(Date.now() / 1000);
             document.getElementById('repo-desc').value = '';
-            document.getElementById('favicon-bg-color').value = ''; // 파비콘 색상 필드 초기화
             document.getElementById('html-code').value = '';
             document.getElementById('js-code').value = '';
+            document.getElementById('favicon-file').value = ''; // 파일 입력 초기화
             statusSection.classList.add('hidden');
             statusSection.innerHTML = '';
         }
@@ -139,9 +133,9 @@
             const token = document.getElementById('github-pat').value.trim();
             const repoName = document.getElementById('repo-name').value.trim();
             const repoDesc = document.getElementById('repo-desc').value.trim() || 'Automated deployment';
-            const faviconBgColor = document.getElementById('favicon-bg-color').value.trim(); // 파비콘 색상값 가져오기
             let htmlCode = document.getElementById('html-code').value;
             const jsCode = document.getElementById('js-code').value;
+            const faviconFile = document.getElementById('favicon-file').files[0];
 
             if (!username || !token || !repoName || !htmlCode) {
                 updateStatusUI('error', { message: 'GitHub 사용자 이름, 액세스 토큰, 저장소 이름, HTML 코드는 필수 입력 항목입니다.' });
@@ -149,41 +143,50 @@
             }
 
             setButtonLoading(true);
-
-            // [수정] 저장소 이름과 배경색으로 파비콘 생성
-            const faviconSVG = generateFaviconSVG(repoName, faviconBgColor);
-            const faviconTag = '<link rel="icon" href="favicon.svg" type="image/svg+xml">';
             
-            if (htmlCode.includes('</head>')) {
-                htmlCode = htmlCode.replace('</head>', `    ${faviconTag}\n</head>`);
-            } else {
-                htmlCode = `<head>\n    ${faviconTag}\n</head>\n` + htmlCode;
-            }
-
-            if (jsCode) {
-                const scriptTag = '<script src="script.js"><' + '/script>';
-                if (htmlCode.includes('</body>')) {
-                    htmlCode = htmlCode.replace('</body>', `    ${scriptTag}\n</body>`);
-                } else {
-                    htmlCode += `\n${scriptTag}`;
-                }
-            }
-
-            const steps = ['저장소 초기화', '파일 업로드', 'Pages 기능 활성화', 'URL 확인'];
-            let currentStep = 0;
-
             try {
+                // [수정] 파일 업로드 및 HTML 수정을 위한 정보 준비
+                let faviconInfo = null;
+                if (faviconFile) {
+                    const content = await readFileAsBase64(faviconFile);
+                    faviconInfo = {
+                        path: faviconFile.name,
+                        content: content,
+                        type: faviconFile.type
+                    };
+                    const faviconTag = `<link rel="icon" href="${faviconInfo.path}" type="${faviconInfo.type}">`;
+                    if (htmlCode.includes('</head>')) {
+                        htmlCode = htmlCode.replace('</head>', `    ${faviconTag}\n</head>`);
+                    } else {
+                        htmlCode = `<head>\n    ${faviconTag}\n</head>\n` + htmlCode;
+                    }
+                }
+
+                if (jsCode) {
+                    const scriptTag = `<script src="script.js"><\/script>`;
+                    if (htmlCode.includes('</body>')) {
+                        htmlCode = htmlCode.replace('</body>', `    ${scriptTag}\n</body>`);
+                    } else {
+                        htmlCode += `\n${scriptTag}`;
+                    }
+                }
+
+                const steps = ['저장소 초기화', '파일 업로드', 'Pages 기능 활성화', 'URL 확인'];
+                let currentStep = 0;
+
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 await githubApi.createRepo(token, repoName, repoDesc);
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 2000)); // GitHub API 안정성을 위한 딜레이
 
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 const fileUploadPromises = [
-                    githubApi.createFile(token, username, repoName, 'index.html', htmlCode),
-                    githubApi.createFile(token, username, repoName, 'favicon.svg', faviconSVG)
+                    githubApi.createFile(token, username, repoName, 'index.html', btoa(unescape(encodeURIComponent(htmlCode))))
                 ];
                 if (jsCode) {
-                    fileUploadPromises.push(githubApi.createFile(token, username, repoName, 'script.js', jsCode));
+                    fileUploadPromises.push(githubApi.createFile(token, username, repoName, 'script.js', btoa(unescape(encodeURIComponent(jsCode)))));
+                }
+                if (faviconInfo) {
+                    fileUploadPromises.push(githubApi.createFile(token, username, repoName, faviconInfo.path, faviconInfo.content));
                 }
                 await Promise.all(fileUploadPromises);
 
@@ -193,10 +196,9 @@
                 updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
                 const finalUrl = await pollForPagesUrl(token, username, repoName);
 
-                updateStatusUI('success', { url: finalUrl, username: username, repoName: repoName });
+                updateStatusUI('success', { url: finalUrl, username, repoName });
             } catch (error) {
-                const errorMessage = `[${steps[currentStep - 1] || '시작'}] 단계 실패: ${error.message}`;
-                updateStatusUI('error', { message: errorMessage, repoUrl: `https://github.com/${username}/${repoName}` });
+                updateStatusUI('error', { message: `배포 실패: ${error.message}`, repoUrl: `https://github.com/${username}/${repoName}` });
             } finally {
                 setButtonLoading(false);
             }
@@ -210,7 +212,7 @@
                 } catch (e) { /* 404는 빌드 중 예상되는 오류 */ }
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
-            throw new Error('시간 초과. Pages 빌드가 지연되고 있습니다. 잠시 후 GitHub 저장소에서 직접 확인해주세요.');
+            throw new Error('시간 초과. Pages 빌드가 지연되고 있습니다.');
         }
 
         function setButtonLoading(isLoading) {
