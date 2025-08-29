@@ -2,281 +2,1128 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Pages 정식 배포 자동화 도구</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>크로노사인: 서바이버</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        html { font-family: 'Inter', sans-serif; }
-        body { background-color: #0f172a; }
-        .panel { background-color: #1e293b; border: 1px solid #334155; }
-        .form-input { background-color: #1e293b; border: 1px solid #475569; color: #e2e8f0; transition: all 0.2s ease-in-out; }
-        .form-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px #4338ca; }
-        .btn-primary { background-image: linear-gradient(to right, #4f46e5, #7c3aed); box-shadow: 0 4px 15px 0 rgba(79, 70, 229, 0.3); }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px 0 rgba(79, 70, 229, 0.4); }
-        .btn-primary:disabled { background-image: none; background-color: #475569; cursor: not-allowed; transform: none; box-shadow: none; }
-        /* 파일 입력 필드 스타일 */
-        input[type="file"]::file-selector-button {
-            @apply bg-slate-600 text-slate-300 font-semibold border-0 rounded-md px-4 py-2 mr-4 cursor-pointer hover:bg-slate-500 transition-colors;
+        :root {
+            --dark-bg: #000000;
+            --panel-bg: rgba(10, 10, 10, 0.9);
+            --border-color: #5a4a3a;
+            --gold-color: #D4AF37;
+            --red-color: #a01c1c;
+            --xp-color: #6d28d9;
+        }
+        body, html { 
+            font-family: 'Noto Sans KR', sans-serif; 
+            background-color: var(--dark-bg); 
+            color: #c7c7c7; 
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .hidden { display: none !important; }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* UI Elements */
+        #top-ui {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 500px;
+            pointer-events: none;
+        }
+        #stage-progress-bar-bg {
+            background-color: #222;
+            border: 2px solid var(--border-color);
+            padding: 2px;
+            border-radius: 5px;
+        }
+        #stage-progress-bar {
+            height: 15px;
+            background: linear-gradient(to right, #fde047, #f59e0b);
+            width: 0%;
+            transition: width 0.3s;
+            border-radius: 2px;
+        }
+        #stage-text {
+            text-align: center;
+            color: white;
+            font-family: 'Cinzel', serif;
+            margin-top: 4px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #game-ui-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            pointer-events: none;
+        }
+        #xp-bar-bg {
+            width: 60%;
+            max-width: 400px;
+            height: 12px;
+            background-color: #222;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        #xp-bar {
+            height: 100%;
+            background: linear-gradient(to right, #8b5cf6, #a78bfa);
+            width: 0%;
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+        #level-text {
+            position: absolute;
+            bottom: 25px;
+            color: white;
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+        }
+        
+        .orb {
+            position: fixed;
+            bottom: 10px;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background-color: #000;
+            border: 4px solid #4a4a4a;
+            overflow: hidden;
+        }
+        #health-orb { left: 10px; }
+        
+        .orb-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background-color: var(--red-color);
+            transition: height 0.2s;
+        }
+        .orb-text {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        /* Modal Windows */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .modal-panel {
+            background-color: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            box-shadow: 0 0 20px black;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+        .modal-title {
+            font-family: 'Cinzel', serif;
+            color: var(--gold-color);
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .upgrade-card {
+            background-color: #1a1a1a;
+            border: 2px solid var(--border-color);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 6px;
+        }
+        .upgrade-card:hover {
+            border-color: var(--gold-color);
+            transform: translateY(-5px);
+        }
+        
+        .game-button {
+            background: linear-gradient(to bottom, #a37d2a, #825e1a);
+            border: 2px solid #5a4a3a;
+            color: white;
+            font-family: 'Cinzel', serif;
+            border-radius: 5px;
+            text-shadow: 1px 1px 2px black;
+            transition: all 0.2s;
+            box-shadow: 0 4px #4d3c28;
+        }
+        .game-button:hover {
+            background: linear-gradient(to bottom, #b88d30, #966c1e);
+            transform: translateY(-2px);
+            box-shadow: 0 6px #4d3c28;
+        }
+        .game-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #4d3c28;
+        }
+
+
+        /* Mobile Controls */
+        #joystick-area, #attack-button-area {
+            position: fixed;
+            bottom: 20px;
+            width: 150px;
+            height: 150px;
+            z-index: 50;
+        }
+        #joystick-area { left: 20px; }
+        #attack-button-area { right: 20px; }
+
+        .control-base {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        .control-stick {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        /* VFX */
+        .damage-text {
+            position: absolute;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+            z-index: 150;
+        }
+        #player-hit-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(255, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 200;
+        }
+        #notification-panel {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+            z-index: 201;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .notification {
+            background-color: var(--panel-bg);
+            color: var(--gold-color);
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: 2px solid var(--border-color);
+            font-family: 'Cinzel', serif;
         }
     </style>
 </head>
-<body class="text-slate-300">
-    <div class="w-full max-w-4xl mx-auto p-4 space-y-6">
-        <header class="text-center py-4">
-            <h1 class="text-3xl md:text-4xl font-bold text-white">GitHub Pages Deployer</h1>
-            <p class="text-slate-400 mt-2">이미지 파일 업로드를 지원하는 최종 버전</p>
-        </header>
+<body>
 
-        <div class="panel rounded-xl p-6 space-y-6">
-            <div class="space-y-4">
-                <label class="text-lg font-semibold text-white">1. GitHub 정보</label>
-                <input type="text" id="github-username" class="form-input rounded-md w-full" placeholder="GitHub 사용자 이름">
-                <div>
-                    <input type="password" id="github-pat" class="form-input rounded-md w-full" placeholder="개인용 액세스 토큰 (PAT)">
-                    <p class="text-xs text-slate-500 mt-1">토큰은 GitHub에 저장되지 않으며, 배포 시에만 사용됩니다.</p>
+    <div id="game-container">
+        <canvas id="game-canvas" tabindex="1"></canvas>
+        <div id="vfx-container"></div>
+        <div id="player-hit-overlay"></div>
+        <div id="notification-panel"></div>
+        
+        <div id="top-ui" class="hidden">
+            <div id="stage-progress-bar-bg">
+                <div id="stage-progress-bar"></div>
+            </div>
+            <p id="stage-text">STAGE 1</p>
+        </div>
+
+        <div id="game-ui-bottom" class="hidden">
+            <div id="xp-bar-bg">
+                <div id="xp-bar"></div>
+            </div>
+            <p id="level-text">LV. 1</p>
+        </div>
+        
+        <div id="health-orb" class="orb hidden">
+            <div id="health-orb-fill" class="orb-fill"></div>
+            <div id="health-orb-text" class="orb-text"></div>
+        </div>
+        
+        <div id="joystick-area" class="hidden">
+            <div class="control-base"></div>
+            <div id="joystick-stick" class="control-stick"></div>
+        </div>
+        <div id="attack-button-area" class="hidden">
+            <div class="control-base"></div>
+            <div id="attack-button" class="control-stick"></div>
+        </div>
+        
+        <div id="modals-container">
+            <div id="intro-screen" class="modal-overlay">
+                <div class="modal-panel text-center">
+                    <h1 class="modal-title text-2xl">크로노사인: 서바이버</h1>
+                    <p class="mb-6 text-gray-400">시간의 균열이 열리고, 모든 시대의 괴물들이 쏟아져 나옵니다. 당신은 이 혼돈 속에서 살아남아야 하는 유일한 희망입니다. 끊임없이 몰려오는 적들을 처치하고, 힘을 키워 균열의 근원을 파괴하십시오.</p>
+                    <button id="start-game-btn" class="game-button text-base py-2 px-8">게임 시작</button>
                 </div>
             </div>
-            <hr class="border-slate-700">
-            <div class="space-y-4">
-                <label class="text-lg font-semibold text-white">2. 저장소 정보</label>
-                <input type="text" id="repo-name" class="form-input rounded-md w-full" placeholder="새 저장소 이름">
-                <input type="text" id="repo-desc" class="form-input rounded-md w-full mt-4" placeholder="저장소 설명 (선택 사항)">
-            </div>
-        </div>
-
-        <div class="panel rounded-xl p-6 flex flex-col">
-            <label for="html-code" class="block text-lg font-semibold text-white mb-4">3. HTML 코드</label>
-            <textarea id="html-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 300px;" placeholder="배포할 HTML 코드를 여기에 붙여넣으세요."></textarea>
-        </div>
-
-        <div class="panel rounded-xl p-6 flex flex-col">
-            <label for="js-code" class="block text-lg font-semibold text-white mb-4">4. JavaScript 코드 (선택 사항)</label>
-            <textarea id="js-code" class="form-input font-mono w-full resize-y rounded-md p-4 text-sm" style="min-height: 150px;" placeholder="배포할 JavaScript 코드를 여기에 붙여넣으세요."></textarea>
-        </div>
-
-        <!-- [수정] 파비콘 이미지 파일 업로드 섹션 -->
-        <div class="panel rounded-xl p-6 flex flex-col">
-            <label for="favicon-file" class="block text-lg font-semibold text-white mb-4">5. 파비콘 이미지 업로드 (선택 사항)</label>
-            <input type="file" id="favicon-file" class="form-input rounded-md w-full text-sm" accept="image/*">
-        </div>
-
-        <div class="panel rounded-xl p-6 space-y-4">
-            <label class="text-lg font-semibold text-white">6. 실행</label>
-            <div class="grid grid-cols-2 gap-4">
-                <button id="reset-button" class="flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-base font-bold w-full transition-all duration-300 ease-in-out bg-slate-700 text-slate-300 hover:bg-slate-600">초기화</button>
-                <button id="deploy-button" class="btn-primary flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-base font-bold w-full transition-all duration-300 ease-in-out">배포 실행</button>
-            </div>
-            <div id="status-section" class="hidden min-h-[100px] pt-4"></div>
+            <div id="hero-selection-screen" class="modal-overlay hidden"></div>
+            <div id="level-up-modal" class="modal-overlay hidden"></div>
+            <div id="game-over-modal" class="modal-overlay hidden"></div>
         </div>
     </div>
 
-    <script>
-        const deployButton = document.getElementById('deploy-button');
-        const resetButton = document.getElementById('reset-button');
-        const statusSection = document.getElementById('status-section');
+    <script type="module">
+        // --- GAME DATA ---
+        const HEROES = {
+            kaelan: { name: "카엘란", baseStats: { hp: 120, str: 15, vit: 12, agi: 8 } },
+            lyra: { name: "라이라", baseStats: { hp: 80, str: 8, vit: 7, agi: 15 } },
+        };
+        const WEAPONS = {
+            magic_missile: { 
+                name: "매직 미사일", type: 'projectile', power: 1.0, speed: 7, size: 5, cooldown: 500,
+                description: "가장 가까운 적에게 미사일을 발사합니다.",
+                evolution: [
+                    { level: 2, projectiles: 2, description: "발사체 2개로 증가" }, 
+                    { level: 3, projectiles: 4, description: "발사체 4개로 증가" }, 
+                    { level: 4, power: 1.5, size: 7, description: "공격력 및 크기 증가" },
+                ]
+            },
+            chain_lightning: {
+                name: "체인 라이트닝", type: 'chain', power: 0.8, cooldown: 2000, chains: 3, range: 150,
+                description: "적에게 튕기는 번개를 발사합니다.",
+                evolution: [ { level: 2, chains: 5, description: "최대 5번 연쇄" }, { level: 3, power: 1.2, description: "공격력 증가" }, { level: 4, chains: 7, description: "최대 7번 연쇄" } ]
+            },
+            fire_aura: {
+                name: "화염 구체", type: 'aura', power: 0.5, cooldown: 1, radius: 50, duration: 2000,
+                description: "주위를 맴도는 화염 구체를 소환합니다.",
+                evolution: [ { level: 2, radius: 75, description: "범위 증가" }, { level: 3, power: 0.8, description: "공격력 증가" }, { level: 4, duration: 3000, description: "지속시간 증가" } ]
+            },
+            ice_shards: {
+                name: "얼음 파편", type: 'projectile', power: 0.7, speed: 6, size: 4, cooldown: 1500, projectiles: 8, angleSpread: 360,
+                description: "모든 방향으로 얼음 파편을 발사합니다.",
+                evolution: [ { level: 2, projectiles: 12, description: "파편 12개로 증가" }, { level: 3, power: 1.0, description: "공격력 증가" }, { level: 4, projectiles: 16, description: "파편 16개로 증가" } ]
+            }
+        };
+        const MONSTERS = {
+            goblin: { name: "고블린", stats: { hp: 80, str: 12, vit: 5, agi: 5 }, xp: 25, radius: 12, color: '#964B00' },
+            bat: { name: "박쥐", stats: { hp: 50, str: 8, vit: 2, agi: 8 }, xp: 15, radius: 10, color: '#4B0082' },
+            ogre: { name: "오우거", stats: { hp: 250, str: 25, vit: 10, agi: 3 }, xp: 50, radius: 20, color: '#808080' },
+            cyclops: { name: "사이클롭스", stats: { hp: 1000, str: 40, vit: 15, agi: 2 }, xp: 200, radius: 30, color: '#D2691E' }
+        };
+        const STAGES = [
+            { killsToAdvance: 20, monsterTypes: ['goblin'] },
+            { killsToAdvance: 30, monsterTypes: ['goblin', 'bat'] },
+            { killsToAdvance: 1, monsterTypes: ['goblin', 'bat', 'ogre'], boss: 'cyclops' },
+        ];
+        const UPGRADE_POOL = ['chain_lightning', 'fire_aura', 'ice_shards'];
 
-        // [수정] 파일 리더를 Promise로 감싸 비동기 처리를 쉽게 함
-        function readFileAsBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    // 데이터 URI에서 Base64 부분만 추출 (e.g., "data:image/png;base64,iVBOR...")
-                    const base64Content = reader.result.split(',')[1];
-                    resolve(base64Content);
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsDataURL(file);
+        // --- GAME STATE & SETUP ---
+        let gameState = {};
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let camera = { x: 0, y: 0 };
+        let joystick = { active: false, angle: 0, x: 0, y: 0 };
+        const keys = {};
+        let mouse = { x: 0, y: 0, down: false };
+        const MAP_SIZE = { width: 3000, height: 3000 };
+        let sounds = {};
+        let animationFrameId;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- DOM ELEMENTS ---
+        const DOMElements = {
+            introScreen: document.getElementById('intro-screen'),
+            heroSelection: document.getElementById('hero-selection-screen'),
+            levelUpModal: document.getElementById('level-up-modal'),
+            gameOverModal: document.getElementById('game-over-modal'),
+            healthOrb: document.getElementById('health-orb'),
+            healthOrbFill: document.getElementById('health-orb-fill'),
+            healthOrbText: document.getElementById('health-orb-text'),
+            xpBar: document.getElementById('xp-bar'),
+            levelText: document.getElementById('level-text'),
+            stageProgress: document.getElementById('stage-progress-bar'),
+            stageText: document.getElementById('stage-text'),
+            joystickArea: document.getElementById('joystick-area'),
+            attackButtonArea: document.getElementById('attack-button-area'),
+            topUI: document.getElementById('top-ui'),
+            bottomUI: document.getElementById('game-ui-bottom'),
+            vfxContainer: document.getElementById('vfx-container'),
+        };
+
+        // --- CORE FUNCTIONS ---
+        function init() {
+            setupEventListeners();
+        }
+
+        function startGame(heroId) {
+            const heroData = HEROES[heroId];
+            gameState = {
+                player: {
+                    ...heroData,
+                    x: MAP_SIZE.width / 2, y: MAP_SIZE.height / 2,
+                    radius: 15, speed: 3,
+                    level: 1, xp: 0, xpToNextLevel: 50,
+                    activeWeapons: [{ id: 'magic_missile', level: 1, lastFired: 0 }],
+                    invincibleUntil: 0,
+                },
+                monsters: [],
+                xpOrbs: [],
+                projectiles: [],
+                vfx: [],
+                stage: 0,
+                killCount: 0,
+                isPaused: false,
+                isGameOver: false,
+            };
+            recalculatePlayerStats();
+            DOMElements.heroSelection.classList.add('hidden');
+            
+            DOMElements.topUI.classList.remove('hidden');
+            DOMElements.bottomUI.classList.remove('hidden');
+            DOMElements.healthOrb.classList.remove('hidden');
+            DOMElements.joystickArea.classList.remove('hidden');
+            DOMElements.attackButtonArea.classList.remove('hidden');
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+        
+        function recalculatePlayerStats() {
+            const p = gameState.player;
+            p.effectiveStats = { ...p.baseStats };
+            p.effectiveStats.hp = p.baseStats.hp + (p.effectiveStats.vit * 10);
+            if (p.currentHp === undefined || p.currentHp > p.effectiveStats.hp) p.currentHp = p.effectiveStats.hp;
+        }
+
+        function spawnMonster() {
+            if (!gameState.player) return;
+            const currentStage = STAGES[gameState.stage];
+            if (!currentStage || currentStage.bossActive) return;
+
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.max(canvas.width, canvas.height) / 2 + 50;
+            const x = gameState.player.x + Math.cos(angle) * radius;
+            const y = gameState.player.y + Math.sin(angle) * radius;
+            
+            const monsterId = currentStage.monsterTypes[Math.floor(Math.random() * currentStage.monsterTypes.length)];
+            const monsterData = JSON.parse(JSON.stringify(MONSTERS[monsterId]));
+            gameState.monsters.push({
+                ...monsterData,
+                x, y,
+                speed: monsterData.stats.agi * 0.2,
+                currentHp: monsterData.stats.hp,
+            });
+        }
+        
+        // --- SOUND MANAGER ---
+        function setupSounds() {
+            sounds.shoot = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 } }).toDestination();
+            sounds.hit = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.05, sustain: 0 } }).toDestination();
+            sounds.xp = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.levelUp = new Tone.PolySynth(Tone.Synth).toDestination();
+        }
+
+        function playSound(effect, options = {}) {
+            if (!sounds[effect] || Tone.context.state !== 'running') return;
+            const now = Tone.now();
+            switch (effect) {
+                case 'shoot': sounds.shoot.triggerAttackRelease('C5', '16n', now); break;
+                case 'hit': sounds.hit.triggerAttackRelease('8n', now); break;
+                case 'xp': sounds.xp.triggerAttackRelease(options.note || 'A5', '16n', now); break;
+                case 'levelUp': sounds.levelUp.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n', now); break;
+            }
+        }
+        
+        // --- GAME LOOP & DRAWING ---
+        let lastSpawnTime = 0;
+        function gameLoop() {
+            if (gameState.isGameOver) return;
+
+            const now = Date.now();
+            if (!gameState.isPaused) {
+                update(now);
+                if (now - lastSpawnTime > (1000 - gameState.stage * 100)) {
+                    spawnMonster();
+                    lastSpawnTime = now;
+                }
+            }
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function update(now) {
+            updatePlayer(now);
+            updateMonsters(now);
+            updateProjectiles();
+            updateXpOrbs();
+            updateVFX(now);
+        }
+
+        function draw() {
+            if (!gameState.player) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            camera.x = gameState.player.x - canvas.width / 2;
+            camera.y = gameState.player.y - canvas.height / 2;
+
+            drawMap();
+            drawXpOrbs();
+            drawProjectiles();
+            drawVFX();
+            drawMonsters();
+            drawPlayer();
+            updateUI();
+        }
+
+        function drawMap() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            const startX = -camera.x % gridSize;
+            const startY = -camera.y % gridSize;
+            
+            for(let x = startX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for(let y = startY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawCharacter(char) {
+            const gradient = ctx.createRadialGradient(
+                char.x - camera.x, char.y - camera.y, char.radius * 0.2,
+                char.x - camera.x, char.y - camera.y, char.radius
+            );
+            gradient.addColorStop(0, char.color);
+            gradient.addColorStop(1, 'black');
+            ctx.fillStyle = gradient;
+
+            ctx.beginPath();
+            ctx.arc(char.x - camera.x, char.y - camera.y, char.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawPlayer() { 
+            if (Date.now() < gameState.player.invincibleUntil) {
+                ctx.globalAlpha = 0.5;
+            }
+            drawCharacter({...gameState.player, color: '#3b82f6'}); 
+            ctx.globalAlpha = 1.0;
+        }
+        function drawMonsters() { gameState.monsters.forEach(m => drawCharacter(m)); }
+        
+        function drawXpOrbs() {
+            gameState.xpOrbs.forEach(orb => {
+                ctx.fillStyle = '#a78bfa';
+                ctx.beginPath();
+                ctx.arc(orb.x - camera.x, orb.y - camera.y, orb.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        function drawProjectiles() {
+            gameState.projectiles.forEach(p => {
+                ctx.fillStyle = p.color || 'white';
+                ctx.beginPath();
+                ctx.arc(p.x - camera.x, p.y - camera.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        function drawVFX() {
+             gameState.vfx.forEach(v => {
+                ctx.fillStyle = v.color;
+                ctx.globalAlpha = v.opacity;
+                ctx.beginPath();
+                if (v.type === 'aura') {
+                    ctx.arc(v.x - camera.x, v.y - camera.y, v.radius, 0, Math.PI * 2);
+                } else if (v.type === 'chain') {
+                    ctx.strokeStyle = v.color;
+                    ctx.lineWidth = v.width;
+                    ctx.beginPath();
+                    ctx.moveTo(v.startX - camera.x, v.startY - camera.y);
+                    ctx.lineTo(v.endX - camera.x, v.endY - camera.y);
+                    ctx.stroke();
+                }
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
             });
         }
 
-        const githubApi = {
-            async request(endpoint, token, options = {}) {
-                const response = await fetch('https://api.github.com' + endpoint, {
-                    ...options,
-                    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', ...options.headers }
+        // --- UPDATE LOGIC ---
+        function updatePlayer(now) {
+            const p = gameState.player;
+            let dx = 0, dy = 0;
+            if (joystick.active) {
+                dx = Math.cos(joystick.angle); dy = Math.sin(joystick.angle);
+            } else {
+                if (keys['w'] || keys['ArrowUp']) dy = -1;
+                if (keys['s'] || keys['ArrowDown']) dy = 1;
+                if (keys['a'] || keys['ArrowLeft']) dx = -1;
+                if (keys['d'] || keys['ArrowRight']) dx = 1;
+            }
+            if (dx !== 0 || dy !== 0) {
+                const magnitude = Math.hypot(dx, dy);
+                p.x += (dx / magnitude) * p.speed;
+                p.y += (dy / magnitude) * p.speed;
+                p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
+                p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
+            }
+            
+            // Automatic attacks
+            p.activeWeapons.forEach(weapon => {
+                if (now > (weapon.lastFired || 0)) {
+                    handlePlayerAttack(weapon, now);
+                }
+            });
+        }
+
+        function updateMonsters(now) {
+            const p = gameState.player;
+            gameState.monsters.forEach(m => {
+                const dist = Math.hypot(p.x - m.x, p.y - m.y);
+                const angle = Math.atan2(p.y - m.y, p.x - m.x);
+                m.x += Math.cos(angle) * m.speed;
+                m.y += Math.sin(angle) * m.speed;
+                
+                if (dist < p.radius + m.radius && now > p.invincibleUntil) {
+                    p.currentHp -= m.stats.str;
+                    p.invincibleUntil = now + 500;
+                    createDamageText(p, m.stats.str, '#ff4d4d');
+                    anime({ targets: '#player-hit-overlay', opacity: [1, 0], duration: 300, easing: 'easeOutQuad' });
+                    if (p.currentHp <= 0) {
+                        gameOver();
+                    }
+                }
+            });
+        }
+
+        function updateProjectiles() {
+            for(let i = gameState.projectiles.length - 1; i >= 0; i--) {
+                const p = gameState.projectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.lifespan--;
+
+                for(let j = gameState.monsters.length - 1; j >= 0; j--) {
+                    const m = gameState.monsters[j];
+                    if (Math.hypot(p.x - m.x, p.y - m.y) < m.radius + p.size) {
+                        m.currentHp -= p.damage;
+                        createDamageText(m, p.damage, 'white');
+                        playSound('hit');
+                        gameState.projectiles.splice(i, 1);
+                        if (m.currentHp <= 0) handleMonsterDeath(m, j);
+                        return;
+                    }
+                }
+                if (p.lifespan <= 0) gameState.projectiles.splice(i, 1);
+            }
+        }
+        
+        function updateVFX(now) {
+            for(let i = gameState.vfx.length - 1; i >= 0; i--) {
+                const v = gameState.vfx[i];
+                v.duration -= 16; // Approx 1 frame
+                v.opacity = v.duration / v.initialDuration;
+                
+                if (v.type === 'aura') {
+                    v.angle += v.speed;
+                    v.x = gameState.player.x + Math.cos(v.angle) * v.orbitRadius;
+                    v.y = gameState.player.y + Math.sin(v.angle) * v.orbitRadius;
+                    
+                    gameState.monsters.forEach(m => {
+                        if (Math.hypot(v.x - m.x, v.y - m.y) < m.radius + v.radius && now > (m.lastAuraHit || 0)) {
+                            m.currentHp -= v.damage;
+                            m.lastAuraHit = now + 500; // Hit once every 0.5s
+                            createDamageText(m, v.damage, '#ff9900');
+                            playSound('hit');
+                            if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
+                        }
+                    });
+                }
+
+                if (v.duration <= 0) {
+                    gameState.vfx.splice(i, 1);
+                }
+            }
+        }
+
+        function updateXpOrbs() {
+            const p = gameState.player;
+            for(let i = gameState.xpOrbs.length - 1; i >= 0; i--) {
+                const orb = gameState.xpOrbs[i];
+                const dist = Math.hypot(p.x - orb.x, p.y - orb.y);
+                if (dist < 100) { // Magnet range
+                    const angle = Math.atan2(p.y - orb.y, p.x - orb.x);
+                    orb.x += Math.cos(angle) * 5;
+                    orb.y += Math.sin(angle) * 5;
+                }
+                if (dist < p.radius) {
+                    p.xp += orb.value;
+                    playSound('xp', {note: 'C6'});
+                    if (p.xp >= p.xpToNextLevel) levelUp();
+                    gameState.xpOrbs.splice(i, 1);
+                }
+            }
+        }
+
+        function handlePlayerAttack(weaponInstance, now) {
+            const p = gameState.player;
+            const weaponData = WEAPONS[weaponInstance.id];
+            
+            const evolutionLevels = weaponData.evolution.filter(e => weaponInstance.level >= e.level);
+            const evolution = evolutionLevels.reduce((acc, val) => ({...acc, ...val}), {});
+
+            weaponInstance.lastFired = now + (weaponData.cooldown / (p.effectiveStats.agi * 0.1));
+            const power = weaponData.power * (evolution.power || 1);
+            const damage = Math.max(1, Math.floor(p.effectiveStats.str * power));
+
+            const findNearestEnemy = (from, exclude = []) => {
+                let nearest = null;
+                let minDistance = Infinity;
+                gameState.monsters.forEach(m => {
+                    if (exclude.includes(m)) return;
+                    const dist = Math.hypot(from.x - m.x, from.y - m.y);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearest = m;
+                    }
                 });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'API 요청 실패');
-                }
-                return response.status === 204 ? null : await response.json();
-            },
-            createRepo: (token, name, desc) => githubApi.request('/user/repos', token, { method: 'POST', body: JSON.stringify({ name, description: desc || '' }) }),
-            createFile: (token, owner, repo, path, content) => githubApi.request(`/repos/${owner}/${repo}/contents/${path}`, token, { method: 'PUT', body: JSON.stringify({ message: `Create ${path}`, content }) }),
-            enablePages: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token, { method: 'POST', body: JSON.stringify({ source: { branch: 'main', path: '/' } }) }),
-            checkPagesStatus: (token, owner, repo) => githubApi.request(`/repos/${owner}/${repo}/pages`, token)
-        };
-
-        document.addEventListener('DOMContentLoaded', () => {
-            handleReset();
-            deployButton.addEventListener('click', handleDeploy);
-            resetButton.addEventListener('click', handleReset);
-        });
-
-        function handleReset() {
-            document.getElementById('github-username').value = '';
-            document.getElementById('github-pat').value = '';
-            document.getElementById('repo-name').value = 'site-' + Math.floor(Date.now() / 1000);
-            document.getElementById('repo-desc').value = '';
-            document.getElementById('html-code').value = '';
-            document.getElementById('js-code').value = '';
-            document.getElementById('favicon-file').value = ''; // 파일 입력 초기화
-            statusSection.classList.add('hidden');
-            statusSection.innerHTML = '';
-        }
-
-        async function handleDeploy() {
-            const username = document.getElementById('github-username').value.trim();
-            const token = document.getElementById('github-pat').value.trim();
-            const repoName = document.getElementById('repo-name').value.trim();
-            const repoDesc = document.getElementById('repo-desc').value.trim() || 'Automated deployment';
-            let htmlCode = document.getElementById('html-code').value;
-            const jsCode = document.getElementById('js-code').value;
-            const faviconFile = document.getElementById('favicon-file').files[0];
-
-            if (!username || !token || !repoName || !htmlCode) {
-                updateStatusUI('error', { message: 'GitHub 사용자 이름, 액세스 토큰, 저장소 이름, HTML 코드는 필수 입력 항목입니다.' });
-                return;
-            }
-
-            setButtonLoading(true);
-            
-            try {
-                // [수정] 파일 업로드 및 HTML 수정을 위한 정보 준비
-                let faviconInfo = null;
-                if (faviconFile) {
-                    const content = await readFileAsBase64(faviconFile);
-                    faviconInfo = {
-                        path: faviconFile.name,
-                        content: content,
-                        type: faviconFile.type
-                    };
-                    const faviconTag = `<link rel="icon" href="${faviconInfo.path}" type="${faviconInfo.type}">`;
-                    if (htmlCode.includes('</head>')) {
-                        htmlCode = htmlCode.replace('</head>', `    ${faviconTag}\n</head>`);
-                    } else {
-                        htmlCode = `<head>\n    ${faviconTag}\n</head>\n` + htmlCode;
-                    }
-                }
-
-                if (jsCode) {
-                    const scriptTag = `<script src="script.js"><\/script>`;
-                    if (htmlCode.includes('</body>')) {
-                        htmlCode = htmlCode.replace('</body>', `    ${scriptTag}\n</body>`);
-                    } else {
-                        htmlCode += `\n${scriptTag}`;
-                    }
-                }
-
-                const steps = ['저장소 초기화', '파일 업로드', 'Pages 기능 활성화', 'URL 확인'];
-                let currentStep = 0;
-
-                updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
-                await githubApi.createRepo(token, repoName, repoDesc);
-                await new Promise(resolve => setTimeout(resolve, 2000)); // GitHub API 안정성을 위한 딜레이
-
-                updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
-                const fileUploadPromises = [
-                    githubApi.createFile(token, username, repoName, 'index.html', btoa(unescape(encodeURIComponent(htmlCode))))
-                ];
-                if (jsCode) {
-                    fileUploadPromises.push(githubApi.createFile(token, username, repoName, 'script.js', btoa(unescape(encodeURIComponent(jsCode)))));
-                }
-                if (faviconInfo) {
-                    fileUploadPromises.push(githubApi.createFile(token, username, repoName, faviconInfo.path, faviconInfo.content));
-                }
-                await Promise.all(fileUploadPromises);
-
-                updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
-                await githubApi.enablePages(token, username, repoName);
-
-                updateStatusUI('loading', { current: ++currentStep, total: steps.length, task: steps[currentStep - 1] });
-                const finalUrl = await pollForPagesUrl(token, username, repoName);
-
-                updateStatusUI('success', { url: finalUrl, username, repoName });
-            } catch (error) {
-                updateStatusUI('error', { message: `배포 실패: ${error.message}`, repoUrl: `https://github.com/${username}/${repoName}` });
-            } finally {
-                setButtonLoading(false);
-            }
-        }
-
-        async function pollForPagesUrl(token, owner, repo) {
-            for (let i = 0; i < 20; i++) {
-                try {
-                    const status = await githubApi.checkPagesStatus(token, owner, repo);
-                    if (status && status.status === 'built' && status.html_url) return status.html_url;
-                } catch (e) { /* 404는 빌드 중 예상되는 오류 */ }
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-            throw new Error('시간 초과. Pages 빌드가 지연되고 있습니다.');
-        }
-
-        function setButtonLoading(isLoading) {
-            deployButton.disabled = isLoading;
-            deployButton.innerHTML = isLoading ? '<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' : '배포 실행';
-        }
-
-        function updateStatusUI(type, data) {
-            statusSection.classList.remove('hidden');
-            let content = '';
-            const iconTemplate = (iconSvg, title, message, colorClass) => `
-                <div class="text-center space-y-3">
-                    ${iconSvg}
-                    <h2 class="text-xl font-semibold text-white">${title}</h2>
-                    <p class="${colorClass || 'text-slate-400'} text-sm">${message}</p>
-                </div>`;
-            const linksTemplate = (url, repoUrl) => `
-                <div class="space-y-3 mt-4 border-t border-slate-700 pt-4">
-                    <div><label class="block text-xs font-medium text-slate-400">웹사이트 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="deployed-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${url}"><button onclick="copyToClipboard('deployed-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div>
-                    <div><label class="block text-xs font-medium text-slate-400">GitHub 저장소 주소</label><div class="flex items-center space-x-2 mt-1"><input type="text" id="repo-url" readonly class="form-input bg-slate-700 text-sm rounded-md w-full" value="${repoUrl}"><button onclick="copyToClipboard('repo-url', this)" class="px-3 py-2 bg-slate-600 text-slate-300 rounded-md hover:bg-slate-500 text-sm flex-shrink-0 transition-colors">복사</button></div></div>
-                    <a href="${url}" target="_blank" class="inline-block mt-2 text-indigo-400 hover:underline">새 탭에서 열기 →</a>
-                </div>`;
-            
-            const icons = {
-                loading: '<svg class="h-8 w-8 text-sky-400 animate-spin mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>',
-                success: '<svg class="h-8 w-8 text-green-400 mx-auto" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>',
-                error: '<svg class="h-8 w-8 text-red-400 mx-auto" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>'
+                return { enemy: nearest, distance: minDistance };
             };
 
-            switch (type) {
-                case 'loading':
-                    content = iconTemplate(icons.loading, data.task, `(${data.current}/${data.total})`);
-                    break;
-                case 'success':
-                    content = iconTemplate(icons.success, '배포 성공!', '사이트가 성공적으로 게시되었습니다.') + linksTemplate(data.url, `https://github.com/${data.username}/${data.repoName}`);
-                    break;
-                case 'error':
-                    content = iconTemplate(icons.error, '오류 발생', data.message, 'text-red-400');
-                    if (data.repoUrl) {
-                        content += linksTemplate(data.repoUrl, data.repoUrl).replace(/웹사이트 주소/g, '생성된 GitHub 저장소').replace('새 탭에서 열기 →', '저장소로 이동 →');
+            switch (weaponData.type) {
+                case 'projectile': {
+                    playSound('shoot');
+                    let targetAngle;
+                    if (weaponInstance.id === 'magic_missile') {
+                        const { enemy } = findNearestEnemy(p);
+                        targetAngle = enemy ? Math.atan2(enemy.y - p.y, enemy.x - p.x) : Math.random() * Math.PI * 2;
+                    } else { // For ice shards
+                        targetAngle = Math.random() * Math.PI * 2;
+                    }
+
+                    const numProjectiles = evolution.projectiles || weaponData.projectiles || 1;
+                    const angleSpread = weaponData.angleSpread ? (Math.PI * 2) / numProjectiles : (evolution.angleSpread || 0.2);
+                    const baseAngle = targetAngle - (angleSpread * (numProjectiles - 1)) / 2;
+
+                    for (let i = 0; i < numProjectiles; i++) {
+                        const currentAngle = weaponData.angleSpread ? i * angleSpread : baseAngle + i * angleSpread;
+                        gameState.projectiles.push({
+                            x: p.x, y: p.y,
+                            vx: Math.cos(currentAngle) * weaponData.speed,
+                            vy: Math.sin(currentAngle) * weaponData.speed,
+                            damage: damage,
+                            size: evolution.size || weaponData.size,
+                            lifespan: 100,
+                            color: weaponInstance.id === 'ice_shards' ? '#60a5fa' : 'white',
+                        });
                     }
                     break;
+                }
+                case 'chain': {
+                    const { enemy } = findNearestEnemy(p);
+                    if (!enemy) return;
+                    
+                    let currentTarget = enemy;
+                    let lastTarget = p;
+                    const hitEnemies = [enemy];
+                    const maxChains = evolution.chains || weaponData.chains;
+
+                    for(let i = 0; i < maxChains; i++) {
+                        if (!currentTarget) break;
+                        currentTarget.currentHp -= damage;
+                        createDamageText(currentTarget, damage, '#facc15');
+                        if (currentTarget.currentHp <= 0) handleMonsterDeath(currentTarget, gameState.monsters.indexOf(currentTarget));
+                        
+                        gameState.vfx.push({
+                            type: 'chain', startX: lastTarget.x, startY: lastTarget.y,
+                            endX: currentTarget.x, endY: currentTarget.y,
+                            color: '#facc15', width: 3, opacity: 1,
+                            duration: 100, initialDuration: 100
+                        });
+                        
+                        lastTarget = currentTarget;
+                        const { enemy: nextTarget } = findNearestEnemy(currentTarget, hitEnemies);
+                        if (nextTarget && Math.hypot(currentTarget.x - nextTarget.x, currentTarget.y - nextTarget.y) < weaponData.range) {
+                            currentTarget = nextTarget;
+                            hitEnemies.push(nextTarget);
+                        } else {
+                            currentTarget = null;
+                        }
+                    }
+                    break;
+                }
+                case 'aura': {
+                    const duration = evolution.duration || weaponData.duration;
+                    gameState.vfx.push({
+                        type: 'aura', x: p.x, y: p.y,
+                        radius: evolution.radius || weaponData.radius,
+                        orbitRadius: 80,
+                        angle: Math.random() * Math.PI * 2,
+                        speed: 0.05,
+                        damage: damage,
+                        color: 'rgba(255, 153, 0, 0.5)',
+                        opacity: 1,
+                        duration: duration,
+                        initialDuration: duration
+                    });
+                    break;
+                }
             }
-            statusSection.innerHTML = content;
+        }
+        
+        function handleMonsterDeath(monster, index) {
+            gameState.killCount++;
+            gameState.xpOrbs.push({ x: monster.x, y: monster.y, value: monster.xp, radius: 5 });
+            if (index > -1) {
+                gameState.monsters.splice(index, 1);
+            }
+            
+            const currentStage = STAGES[gameState.stage];
+            if (currentStage && !currentStage.bossActive && gameState.killCount >= currentStage.killsToAdvance) {
+                if(currentStage.boss) {
+                    spawnBoss(currentStage.boss);
+                    currentStage.bossActive = true;
+                } else {
+                    gameState.stage++;
+                    gameState.killCount = 0;
+                }
+            }
         }
 
-        function copyToClipboard(elementId, buttonElement) {
-            const input = document.getElementById(elementId);
-            input.select();
-            input.setSelectionRange(0, 99999);
-            try {
-                document.execCommand('copy');
-                const originalText = buttonElement.textContent;
-                buttonElement.textContent = '복사됨!';
-                buttonElement.classList.add('bg-green-600', 'text-white');
-                setTimeout(() => {
-                    buttonElement.textContent = originalText;
-                    buttonElement.classList.remove('bg-green-600', 'text-white');
-                }, 2000);
-            } catch (err) {
-                console.error('클립보드 복사 실패:', err);
+        function spawnBoss(bossId) {
+            const monsterData = JSON.parse(JSON.stringify(MONSTERS[bossId]));
+            gameState.monsters.push({
+                ...monsterData,
+                x: gameState.player.x + 300, y: gameState.player.y,
+                speed: monsterData.stats.agi * 0.2,
+                currentHp: monsterData.stats.hp,
+            });
+        }
+        
+        function levelUp() {
+            const p = gameState.player;
+            p.level++;
+            p.xp -= p.xpToNextLevel;
+            p.xpToNextLevel = Math.floor(p.xpToNextLevel * 1.2);
+            
+            gameState.isPaused = true;
+            playSound('levelUp');
+            showLevelUpModal();
+
+            recalculatePlayerStats();
+            p.currentHp = p.effectiveStats.hp;
+            playLevelUpEffect();
+        }
+        
+        function gameOver() {
+            gameState.isPaused = true;
+            gameState.isGameOver = true;
+            DOMElements.gameOverModal.innerHTML = `<div class="modal-panel text-center">
+                <h1 class="modal-title text-2xl text-red-500">게임 오버</h1>
+                <p class="mb-6 text-gray-400">당신은 ${gameState.stage + 1} 스테이지에서 ${gameState.killCount}마리의 적을 처치했습니다.</p>
+                <button id="restart-game-btn" class="game-button text-base py-2 px-8">다시 시작</button>
+            </div>`;
+            DOMElements.gameOverModal.classList.remove('hidden');
+            document.getElementById('restart-game-btn').addEventListener('click', () => {
+                DOMElements.gameOverModal.classList.add('hidden');
+                document.location.reload(); // Simple reload for restart
+            });
+        }
+
+        // --- VFX using anime.js ---
+        function createDamageText(entity, amount, color) {
+            const textEl = document.createElement('div');
+            textEl.className = 'damage-text';
+            textEl.textContent = Math.floor(amount);
+            textEl.style.color = color;
+            textEl.style.left = `${entity.x - camera.x}px`;
+            textEl.style.top = `${entity.y - camera.y - entity.radius}px`;
+            DOMElements.vfxContainer.appendChild(textEl);
+            
+            anime({
+                targets: textEl,
+                translateY: [0, -50],
+                opacity: [1, 0],
+                duration: 800,
+                easing: 'easeOutQuad',
+                complete: () => textEl.remove()
+            });
+        }
+
+        function playLevelUpEffect() {
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.style.position = 'absolute';
+                particle.style.background = '#D4AF37';
+                particle.style.width = `${Math.random() * 5 + 2}px`;
+                particle.style.height = particle.style.width;
+                particle.style.borderRadius = '50%';
+                particle.style.left = `${canvas.width / 2}px`;
+                particle.style.top = `${canvas.height / 2}px`;
+                DOMElements.vfxContainer.appendChild(particle);
+
+                anime({
+                    targets: particle,
+                    translateX: anime.random(-150, 150),
+                    translateY: anime.random(-150, 150),
+                    opacity: [1, 0],
+                    duration: 1000,
+                    easing: 'easeOutExpo',
+                    complete: () => particle.remove()
+                });
             }
         }
+        
+        // --- UI & CONTROLS ---
+        function setupEventListeners() {
+            document.getElementById('start-game-btn').addEventListener('click', async () => {
+                await Tone.start();
+                setupSounds();
+                DOMElements.introScreen.classList.add('hidden');
+                renderHeroSelection(); // FIX: Call renderHeroSelection
+                DOMElements.heroSelection.classList.remove('hidden');
+            });
+
+            window.addEventListener('keydown', e => keys[e.key] = true);
+            window.addEventListener('keyup', e => keys[e.key] = false);
+
+            canvas.addEventListener('mousedown', e => mouse.down = true);
+            canvas.addEventListener('mouseup', e => mouse.down = false);
+            canvas.addEventListener('mousemove', e => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            });
+
+            const joystickArea = DOMElements.joystickArea;
+            const stick = document.getElementById('joystick-stick');
+            
+            function handleTouch(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const baseRect = joystickArea.getBoundingClientRect();
+                const centerX = baseRect.left + baseRect.width / 2;
+                const centerY = baseRect.top + baseRect.height / 2;
+                const dx = touch.clientX - centerX;
+                const dy = touch.clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+                const maxDist = baseRect.width / 2 - stick.offsetWidth / 2;
+
+                joystick.active = true;
+                joystick.angle = Math.atan2(dy, dx);
+                
+                const clampedDist = Math.min(dist, maxDist);
+                const stickX = Math.cos(joystick.angle) * clampedDist;
+                const stickY = Math.sin(joystick.angle) * clampedDist;
+
+                stick.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
+            }
+            
+            joystickArea.addEventListener('touchstart', handleTouch, {passive: false});
+            joystickArea.addEventListener('touchmove', handleTouch, {passive: false});
+            joystickArea.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                joystick.active = false;
+                stick.style.transform = 'translate(-50%, -50%)';
+            });
+            
+            const attackBtn = DOMElements.attackButtonArea;
+            attackBtn.addEventListener('touchstart', e => { e.preventDefault(); mouse.down = true; });
+            attackBtn.addEventListener('touchend', e => { e.preventDefault(); mouse.down = false; });
+        }
+        
+        function renderHeroSelection() {
+            const container = DOMElements.heroSelection;
+            container.innerHTML = `<div class="modal-panel text-center">
+                <h2 class="modal-title">영웅을 선택하십시오</h2>
+                <div id="hero-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>`;
+            const cardContainer = document.getElementById('hero-cards-container');
+            for (const id in HEROES) {
+                const hero = HEROES[id];
+                const card = document.createElement('div');
+                const description = id === 'kaelan' 
+                    ? '높은 체력과 힘을 가진 근접 전사입니다. 안정적인 플레이에 적합합니다.' 
+                    : '민첩함이 특기인 원거리 딜러입니다. 빠른 공격 속도를 자랑합니다.';
+
+                card.className = 'p-4 border-2 border-gray-700 rounded-lg hover:border-yellow-500 cursor-pointer flex flex-col justify-between text-center';
+                card.innerHTML = `
+                    <div>
+                        <div class="w-full h-24 bg-gray-900 rounded-md mb-4 flex items-center justify-center">
+                           <p class="text-gray-500">[${hero.name} 이미지]</p>
+                        </div>
+                        <h3 class="font-cinzel text-lg text-yellow-400">${hero.name}</h3>
+                        <p class="text-xs text-gray-400 mt-2 h-12">${description}</p>
+                    </div>
+                    <div class="text-sm text-gray-200 mt-4 border-t border-gray-600 pt-2 grid grid-cols-3 gap-1 text-center">
+                        <span class="text-red-400">HP: ${hero.baseStats.hp}</span>
+                        <span class="text-orange-400">STR: ${hero.baseStats.str}</span>
+                        <span class="text-blue-400">AGI: ${hero.baseStats.agi}</span>
+                    </div>`;
+                card.addEventListener('click', () => startGame(id));
+                cardContainer.appendChild(card);
+            }
+        }
+
+        function updateUI() {
+            if (!gameState.player) return;
+            const p = gameState.player;
+            DOMElements.healthOrbFill.style.height = `${(p.currentHp / p.effectiveStats.hp) * 100}%`;
+            DOMElements.healthOrbText.textContent = `${Math.ceil(p.currentHp)}`;
+            DOMElements.xpBar.style.width = `${(p.xp / p.xpToNextLevel) * 100}%`;
+            DOMElements.levelText.textContent = `LV. ${p.level}`;
+            
+            const currentStage = STAGES[gameState.stage];
+            if(currentStage) {
+                const kills = currentStage.bossActive ? currentStage.killsToAdvance : gameState.killCount;
+                DOMElements.stageProgress.style.width = `${(kills / currentStage.killsToAdvance) * 100}%`;
+                DOMElements.stageText.textContent = `STAGE ${gameState.stage + 1}`;
+            }
+        }
+        
+        function showLevelUpModal() {
+            const p = gameState.player;
+            const choices = [];
+            const existingWeapons = p.activeWeapons.map(w => w.id);
+            const newWeaponPool = UPGRADE_POOL.filter(wId => !existingWeapons.includes(wId));
+            
+            // Create a pool of possible upgrades
+            let upgradeOptions = [];
+            // Add existing weapons that can be upgraded
+            p.activeWeapons.forEach(w => {
+                const weaponData = WEAPONS[w.id];
+                const maxLevel = weaponData.evolution.length > 0 ? Math.max(...weaponData.evolution.map(e => e.level)) : 1;
+                if (w.level < maxLevel) {
+                    upgradeOptions.push({ id: w.id, level: w.level, isNew: false });
+                }
+            });
+            // Add new weapons if available
+            if (newWeaponPool.length > 0 && p.activeWeapons.length < 6) {
+                 newWeaponPool.forEach(wId => {
+                     upgradeOptions.push({ id: wId, level: 0, isNew: true });
+                 });
+            }
+
+            // Randomly pick 3 choices
+            while(choices.length < 3 && upgradeOptions.length > 0) {
+                const randIndex = Math.floor(Math.random() * upgradeOptions.length);
+                const chosen = upgradeOptions.splice(randIndex, 1)[0];
+                choices.push(chosen);
+            }
+
+            DOMElements.levelUpModal.innerHTML = `<div class="modal-panel">
+                <h2 class="modal-title">레벨 업!</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    ${choices.map(c => {
+                        const weaponData = WEAPONS[c.id];
+                        if (c.isNew) {
+                             return `<div class="upgrade-card" data-type="new" data-id="${c.id}">
+                                 <h3 class="font-bold text-lg text-green-400">새 무기: ${weaponData.name}</h3>
+                                 <p class="text-sm text-gray-400">${weaponData.description}</p>
+                             </div>`;
+                        } else {
+                            const nextLevel = c.level + 1;
+                            const evolution = weaponData.evolution.find(e => e.level === nextLevel);
+                            return `<div class="upgrade-card" data-type="upgrade" data-id="${c.id}">
+                                 <h3 class="font-bold text-lg text-yellow-400">${weaponData.name} 강화</h3>
+                                 <p class="text-sm text-gray-400">Lv. ${c.level} -> Lv. ${nextLevel}</p>
+                                 ${evolution ? `<p class="text-sm text-cyan-400 mt-2">${evolution.description}</p>` : ''}
+                             </div>`;
+                        }
+                    }).join('')}
+                </div>
+            </div>`;
+            DOMElements.levelUpModal.classList.remove('hidden');
+            DOMElements.levelUpModal.querySelectorAll('.upgrade-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const choiceType = e.currentTarget.dataset.type;
+                    const weaponId = e.currentTarget.dataset.id;
+                    if (choiceType === 'new') {
+                        p.activeWeapons.push({ id: weaponId, level: 1, lastFired: 0 });
+                    } else {
+                        const weaponToUpgrade = p.activeWeapons.find(w => w.id === weaponId);
+                        if(weaponToUpgrade) weaponToUpgrade.level++;
+                    }
+                    DOMElements.levelUpModal.classList.add('hidden');
+                    gameState.isPaused = false;
+                });
+            });
+        }
+        
+        // --- INITIALIZE ---
+        window.addEventListener('DOMContentLoaded', init);
+
     </script>
 </body>
 </html>
-
