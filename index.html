@@ -392,7 +392,7 @@
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         let camera = { x: 0, y: 0 };
-        let moveJoystick = { active: false, angle: 0, intensity: 0 };
+        let moveJoystick = { active: false, dx: 0, dy: 0 };
         let skillJoystick = { active: false, angle: 0, intensity: 0 };
         const keys = {};
         const MAP_SIZE = { width: 3000, height: 3000 };
@@ -446,7 +446,7 @@
                     grenade: {
                         cooldown: 8000,
                         lastUsed: -8000,
-                        throwRange: 200,
+                        throwRange: 300,
                         blastRadius: 100,
                         power: 2.5,
                         fuse: 1500,
@@ -564,12 +564,21 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             camera.x = gameState.player.x - canvas.width / 2;
             camera.y = gameState.player.y - canvas.height / 2;
+            
+            // OPTIMIZATION: Create camera bounds for culling
+            const buffer = 50; // 50px buffer to prevent pop-in
+            const cameraBounds = {
+                left: camera.x - buffer,
+                right: camera.x + canvas.width + buffer,
+                top: camera.y - buffer,
+                bottom: camera.y + canvas.height + buffer
+            };
 
             drawMap();
-            drawXpOrbs();
-            drawProjectiles();
-            drawVFX();
-            drawMonsters();
+            drawXpOrbs(cameraBounds);
+            drawProjectiles(cameraBounds);
+            drawVFX(cameraBounds);
+            drawMonsters(cameraBounds);
             drawPlayer();
             drawGrenadeTrajectory();
             updateUI();
@@ -621,56 +630,77 @@
                 ctx.stroke();
             }
         }
-        function drawMonsters() { gameState.monsters.forEach(m => drawCharacter(m)); }
-        
-        function drawXpOrbs() {
-            gameState.xpOrbs.forEach(orb => {
-                ctx.fillStyle = '#a78bfa';
-                ctx.beginPath();
-                ctx.arc(orb.x - camera.x, orb.y - camera.y, orb.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
+        function drawMonsters(bounds) {
+            for (const m of gameState.monsters) {
+                if (m.x + m.radius > bounds.left && m.x - m.radius < bounds.right &&
+                    m.y + m.radius > bounds.top && m.y - m.radius < bounds.bottom) {
+                    drawCharacter(m);
+                }
+            }
         }
         
-        function drawProjectiles() {
-            gameState.projectiles.forEach(p => {
-                ctx.fillStyle = p.color || 'white';
-                ctx.beginPath();
-                ctx.arc(p.x - camera.x, p.y - camera.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-        }
-        
-        function drawVFX() {
-             gameState.vfx.forEach(v => {
-                ctx.save();
-                ctx.globalAlpha = v.opacity;
-                if (v.type === 'chain') {
-                    ctx.strokeStyle = v.color;
-                    ctx.lineWidth = v.width;
+        function drawXpOrbs(bounds) {
+            ctx.fillStyle = '#a78bfa';
+            for (const orb of gameState.xpOrbs) {
+                 if (orb.x + orb.radius > bounds.left && orb.x - orb.radius < bounds.right &&
+                    orb.y + orb.radius > bounds.top && orb.y - orb.radius < bounds.bottom) {
                     ctx.beginPath();
-                    ctx.moveTo(v.startX - camera.x, v.startY - camera.y);
-                    ctx.lineTo(v.endX - camera.x, v.endY - camera.y);
-                    ctx.stroke();
-                } else {
-                    ctx.fillStyle = v.color;
-                    ctx.beginPath();
-                    ctx.arc(v.x - camera.x, v.y - camera.y, v.radius, 0, Math.PI * 2);
+                    ctx.arc(orb.x - camera.x, orb.y - camera.y, orb.radius, 0, Math.PI * 2);
                     ctx.fill();
                 }
-                ctx.restore();
-            });
+            }
+        }
+        
+        function drawProjectiles(bounds) {
+            for (const p of gameState.projectiles) {
+                 if (p.x + p.size > bounds.left && p.x - p.size < bounds.right &&
+                    p.y + p.size > bounds.top && p.y - p.size < bounds.bottom) {
+                    ctx.fillStyle = p.color || 'white';
+                    ctx.beginPath();
+                    ctx.arc(p.x - camera.x, p.y - camera.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        function drawVFX(bounds) {
+             for (const v of gameState.vfx) {
+                if (v.x + (v.radius || 0) > bounds.left && v.x - (v.radius || 0) < bounds.right &&
+                    v.y + (v.radius || 0) > bounds.top && v.y - (v.radius || 0) < bounds.bottom) {
+                    ctx.save();
+                    ctx.globalAlpha = v.opacity;
+                    if (v.type === 'chain') {
+                        ctx.strokeStyle = v.color;
+                        ctx.lineWidth = v.width;
+                        ctx.beginPath();
+                        ctx.moveTo(v.startX - camera.x, v.startY - camera.y);
+                        ctx.lineTo(v.endX - camera.x, v.endY - camera.y);
+                        ctx.stroke();
+                    } else {
+                        ctx.fillStyle = v.color;
+                        ctx.beginPath();
+                        ctx.arc(v.x - camera.x, v.y - camera.y, v.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
+            }
         }
 
         function drawGrenadeTrajectory() {
-            if (!skillJoystick.active || !gameState.player) return;
-
             const p = gameState.player;
+            if (!skillJoystick.active || !p) return;
+            
+            const now = Date.now();
+            const isReady = now > p.grenade.lastUsed + p.grenade.cooldown;
+            if (!isReady) return;
+
             const startX = p.x - camera.x;
             const startY = p.y - camera.y;
             
-            const endX = p.x + Math.cos(skillJoystick.angle) * p.grenade.throwRange - camera.x;
-            const endY = p.y + Math.sin(skillJoystick.angle) * p.grenade.throwRange - camera.y;
+            const currentThrowRange = p.grenade.throwRange * skillJoystick.intensity;
+            const endX = p.x + Math.cos(skillJoystick.angle) * currentThrowRange - camera.x;
+            const endY = p.y + Math.sin(skillJoystick.angle) * currentThrowRange - camera.y;
 
             ctx.save();
             ctx.setLineDash([10, 10]);
@@ -681,7 +711,6 @@
             ctx.lineTo(endX, endY);
             ctx.stroke();
 
-            // Draw landing circle
             ctx.beginPath();
             ctx.arc(endX, endY, p.grenade.blastRadius, 0, Math.PI * 2);
             ctx.stroke();
@@ -693,12 +722,10 @@
         function updatePlayer(now) {
             const p = gameState.player;
             let dx = 0, dy = 0;
-            let speedMultiplier = 1.0;
-
+            
             if (moveJoystick.active) {
-                dx = Math.cos(moveJoystick.angle);
-                dy = Math.sin(moveJoystick.angle);
-                speedMultiplier = moveJoystick.intensity;
+                dx = moveJoystick.dx;
+                dy = moveJoystick.dy;
             } else {
                 if (keys['w'] || keys['ArrowUp']) dy = -1;
                 if (keys['s'] || keys['ArrowDown']) dy = 1;
@@ -706,10 +733,8 @@
                 if (keys['d'] || keys['ArrowRight']) dx = 1;
             }
             if (dx !== 0 || dy !== 0) {
-                const magnitude = Math.hypot(dx, dy);
-                const currentSpeed = p.speed * speedMultiplier;
-                p.x += (dx / magnitude) * currentSpeed;
-                p.y += (dy / magnitude) * currentSpeed;
+                p.x += dx * p.speed;
+                p.y += dy * p.speed;
             }
             p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
             p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
@@ -802,20 +827,20 @@
             const power = weaponData.power * (evolution.power || 1);
             const damage = Math.max(1, Math.floor(p.effectiveStats.str * power));
 
-            const findNearestEnemy = (from, exclude = []) => {
+            const findNearestEnemy = (from, exclude = [], maxRange = Infinity) => {
                 let nearest = null; let minDistance = Infinity;
-                gameState.monsters.forEach(m => {
-                    if (exclude.includes(m)) return;
+                for(const m of gameState.monsters) {
+                    if (exclude.includes(m)) continue;
                     const dist = Math.hypot(from.x - m.x, from.y - m.y);
-                    if (dist < minDistance) {
+                    if (dist < minDistance && dist < maxRange) {
                         minDistance = dist;
                         nearest = m;
                     }
-                });
+                }
                 return { enemy: nearest, distance: minDistance };
             };
 
-            const { enemy: nearestEnemy, distance: nearestDist } = findNearestEnemy(p);
+            const { enemy: nearestEnemy, distance: nearestDist } = findNearestEnemy(p, [], canvas.width);
             if (!nearestEnemy && weaponData.type !== 'pulse_aura' && !weaponData.is360) return;
             
             let targetAngle = nearestEnemy ? Math.atan2(nearestEnemy.y - p.y, nearestEnemy.x - p.x) : 0;
@@ -871,13 +896,13 @@
                 case 'pulse_aura': {
                     const radius = evolution.radius || weaponData.radius;
                     createExpandingRingVFX(p.x, p.y, radius, '#ff9900', 300);
-                    gameState.monsters.forEach(m => {
+                    for(const m of gameState.monsters) {
                         if (Math.hypot(p.x - m.x, p.y - m.y) < radius) {
                             m.currentHp -= damage;
                             createDamageText(m, damage, '#ff9900');
                             if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
                         }
-                    });
+                    }
                     break;
                 }
             }
@@ -1021,7 +1046,7 @@
             window.addEventListener('keydown', e => keys[e.key] = true);
             window.addEventListener('keyup', e => keys[e.key] = false);
 
-            function createJoystickHandler(joystickObj, stickEl) {
+            function createJoystickHandler(joystickObj, stickEl, isMovement) {
                 return function handleTouch(e) {
                     e.preventDefault();
                     const touch = e.touches[0];
@@ -1032,55 +1057,68 @@
                     const dy = touch.clientY - centerY;
                     
                     joystickObj.active = true;
-                    joystickObj.angle = Math.atan2(dy, dx);
                     
                     const dist = Math.hypot(dx, dy);
-                    const maxDist = baseRect.width / 2 - stickEl.offsetWidth / 2;
-                    const clampedDist = Math.min(dist, maxDist);
-                    joystickObj.intensity = clampedDist / maxDist;
+                    const angle = Math.atan2(dy, dx);
+                    
+                    if (isMovement) {
+                        if (dist > 0) {
+                            joystickObj.dx = dx / dist;
+                            joystickObj.dy = dy / dist;
+                        }
+                    } else {
+                        joystickObj.angle = angle;
+                        const maxDist = (baseRect.width / 2);
+                        const clampedDist = Math.min(dist, maxDist);
+                        joystickObj.intensity = clampedDist / maxDist;
+                    }
 
-                    const stickX = Math.cos(joystickObj.angle) * clampedDist;
-                    const stickY = Math.sin(joystickObj.angle) * clampedDist;
+                    const stickMaxDist = (baseRect.width / 2) - (stickEl.offsetWidth / 2);
+                    const stickClamped = Math.min(dist, stickMaxDist);
+                    const stickX = Math.cos(angle) * stickClamped;
+                    const stickY = Math.sin(angle) * stickClamped;
 
                     stickEl.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
                 }
             }
             
             const moveStick = document.getElementById('joystick-stick');
-            const handleMove = createJoystickHandler(moveJoystick, moveStick);
+            const handleMove = createJoystickHandler(moveJoystick, moveStick, true);
             DOMElements.joystickArea.addEventListener('touchstart', handleMove, {passive: false});
             DOMElements.joystickArea.addEventListener('touchmove', handleMove, {passive: false});
             DOMElements.joystickArea.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 moveJoystick.active = false;
-                moveJoystick.intensity = 0;
+                moveJoystick.dx = 0;
+                moveJoystick.dy = 0;
                 moveStick.style.transform = 'translate(-50%, -50%)';
             });
 
             const skillStick = document.getElementById('skill-joystick-stick');
-            const handleSkill = createJoystickHandler(skillJoystick, skillStick);
+            const handleSkill = createJoystickHandler(skillJoystick, skillStick, false);
             DOMElements.skillJoystickArea.addEventListener('touchstart', handleSkill, {passive: false});
             DOMElements.skillJoystickArea.addEventListener('touchmove', handleSkill, {passive: false});
             DOMElements.skillJoystickArea.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                throwGrenade(skillJoystick.angle);
+                throwGrenade(skillJoystick.angle, skillJoystick.intensity);
                 skillJoystick.active = false;
+                skillJoystick.intensity = 0;
                 skillStick.style.transform = 'translate(-50%, -50%)';
             });
         }
         
-        function throwGrenade(angle) {
+        function throwGrenade(angle, intensity) {
             const p = gameState.player;
             const now = Date.now();
-            if (!p || now < p.grenade.lastUsed + p.grenade.cooldown) return;
+            if (!p || now < p.grenade.lastUsed + p.grenade.cooldown || intensity < 0.1) return;
 
             p.grenade.lastUsed = now;
             playSound('throw');
 
-            const targetX = p.x + Math.cos(angle) * p.grenade.throwRange;
-            const targetY = p.y + Math.sin(angle) * p.grenade.throwRange;
+            const currentThrowRange = p.grenade.throwRange * intensity;
+            const targetX = p.x + Math.cos(angle) * currentThrowRange;
+            const targetY = p.y + Math.sin(angle) * currentThrowRange;
             
-            // Landing indicator
             createExpandingRingVFX(targetX, targetY, p.grenade.blastRadius, 'rgba(255, 100, 100, 0.5)', p.grenade.fuse);
 
             setTimeout(() => {
