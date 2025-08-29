@@ -206,7 +206,7 @@
 
 
         /* Mobile Controls */
-        #joystick-area, #attack-button-area {
+        #joystick-area, #skill-joystick-area {
             position: fixed;
             bottom: 20px;
             width: 150px;
@@ -214,7 +214,7 @@
             z-index: 50;
         }
         #joystick-area { left: 20px; }
-        #attack-button-area { right: 20px; }
+        #skill-joystick-area { right: 20px; }
 
         .control-base {
             position: absolute;
@@ -236,6 +236,18 @@
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
+        }
+        #skill-cooldown-overlay {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.6);
+            clip-path: inset(100% 0 0 0);
+            transition: clip-path 0.1s linear;
         }
         
         /* VFX */
@@ -309,9 +321,11 @@
             <div class="control-base"></div>
             <div id="joystick-stick" class="control-stick"></div>
         </div>
-        <div id="attack-button-area" class="hidden">
-            <div class="control-base"></div>
-            <div id="attack-button" class="control-stick"></div>
+        <div id="skill-joystick-area" class="hidden">
+            <div class="control-base">
+                <div id="skill-cooldown-overlay"></div>
+            </div>
+            <div id="skill-joystick-stick" class="control-stick"></div>
         </div>
         
         <div id="modals-container">
@@ -347,15 +361,15 @@
             chain_lightning: {
                 name: "체인 라이트닝", type: 'chain', power: 0.8, cooldown: 2000, chains: 3, range: 150,
                 description: "적에게 튕기는 번개를 발사합니다.",
-                evolution: [ { level: 2, chains: 5, description: "최대 5번 연쇄" }, { level: 3, power: 1.2, description: "공격력 증가" }, { level: 4, chains: 7, description: "최대 7번 연쇄" } ]
+                evolution: [ { level: 2, chains: 5, description: "최대 5번 연쇄" }, { level: 3, power: 1.2, description: "공격력 증가" }, { level: 4, chains: 7, range: 200, description: "최대 7번 연쇄, 범위 증가" } ]
             },
-            fire_aura: {
-                name: "화염 구체", type: 'aura', power: 0.5, cooldown: 1, radius: 50, duration: 2000,
-                description: "주위를 맴도는 화염 구체를 소환합니다.",
-                evolution: [ { level: 2, radius: 75, description: "범위 증가" }, { level: 3, power: 0.8, description: "공격력 증가" }, { level: 4, duration: 3000, description: "지속시간 증가" } ]
+            fire_pulse: {
+                name: "화염 파동", type: 'pulse_aura', power: 0.3, cooldown: 2500, radius: 120,
+                description: "주기적으로 주변에 화염 파동을 방출하여 피해를 줍니다.",
+                evolution: [ { level: 2, radius: 150, description: "범위 증가" }, { level: 3, power: 0.5, description: "공격력 증가" }, { level: 4, cooldown: 2000, description: "쿨타임 감소" } ]
             },
             ice_shards: {
-                name: "얼음 파편", type: 'projectile', power: 0.7, speed: 6, size: 4, cooldown: 1500, projectiles: 8, angleSpread: 360,
+                name: "얼음 파편", type: 'projectile', power: 0.7, speed: 6, size: 4, cooldown: 1500, projectiles: 8, is360: true,
                 description: "모든 방향으로 얼음 파편을 발사합니다.",
                 evolution: [ { level: 2, projectiles: 12, description: "파편 12개로 증가" }, { level: 3, power: 1.0, description: "공격력 증가" }, { level: 4, projectiles: 16, description: "파편 16개로 증가" } ]
             }
@@ -371,16 +385,16 @@
             { killsToAdvance: 30, monsterTypes: ['goblin', 'bat'] },
             { killsToAdvance: 1, monsterTypes: ['goblin', 'bat', 'ogre'], boss: 'cyclops' },
         ];
-        const UPGRADE_POOL = ['chain_lightning', 'fire_aura', 'ice_shards'];
+        const UPGRADE_POOL = ['chain_lightning', 'fire_pulse', 'ice_shards'];
 
         // --- GAME STATE & SETUP ---
         let gameState = {};
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         let camera = { x: 0, y: 0 };
-        let joystick = { active: false, angle: 0, x: 0, y: 0 };
+        let moveJoystick = { active: false, angle: 0 };
+        let skillJoystick = { active: false, angle: 0 };
         const keys = {};
-        let mouse = { x: 0, y: 0, down: false };
         const MAP_SIZE = { width: 3000, height: 3000 };
         let sounds = {};
         let animationFrameId;
@@ -406,7 +420,8 @@
             stageProgress: document.getElementById('stage-progress-bar'),
             stageText: document.getElementById('stage-text'),
             joystickArea: document.getElementById('joystick-area'),
-            attackButtonArea: document.getElementById('attack-button-area'),
+            skillJoystickArea: document.getElementById('skill-joystick-area'),
+            skillCooldownOverlay: document.getElementById('skill-cooldown-overlay'),
             topUI: document.getElementById('top-ui'),
             bottomUI: document.getElementById('game-ui-bottom'),
             vfxContainer: document.getElementById('vfx-container'),
@@ -427,6 +442,15 @@
                     level: 1, xp: 0, xpToNextLevel: 50,
                     activeWeapons: [{ id: 'magic_missile', level: 1, lastFired: 0 }],
                     invincibleUntil: 0,
+                    attackRange: 0,
+                    grenade: {
+                        cooldown: 8000,
+                        lastUsed: -8000,
+                        throwRange: 200,
+                        blastRadius: 100,
+                        power: 2.5,
+                        fuse: 1500,
+                    },
                 },
                 monsters: [],
                 xpOrbs: [],
@@ -444,7 +468,7 @@
             DOMElements.bottomUI.classList.remove('hidden');
             DOMElements.healthOrb.classList.remove('hidden');
             DOMElements.joystickArea.classList.remove('hidden');
-            DOMElements.attackButtonArea.classList.remove('hidden');
+            DOMElements.skillJoystickArea.classList.remove('hidden');
             
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             gameLoop();
@@ -455,6 +479,17 @@
             p.effectiveStats = { ...p.baseStats };
             p.effectiveStats.hp = p.baseStats.hp + (p.effectiveStats.vit * 10);
             if (p.currentHp === undefined || p.currentHp > p.effectiveStats.hp) p.currentHp = p.effectiveStats.hp;
+            
+            p.attackRange = 0;
+            p.activeWeapons.forEach(w => {
+                const weaponData = WEAPONS[w.id];
+                if (weaponData.range || weaponData.type === 'pulse_aura') {
+                    const evolutionLevels = weaponData.evolution.filter(e => w.level >= e.level);
+                    const evolution = evolutionLevels.reduce((acc, val) => ({...acc, ...val}), {});
+                    const currentRange = evolution.range || evolution.radius || weaponData.range || weaponData.radius;
+                    if (currentRange > p.attackRange) p.attackRange = currentRange;
+                }
+            });
         }
 
         function spawnMonster() {
@@ -470,8 +505,7 @@
             const monsterId = currentStage.monsterTypes[Math.floor(Math.random() * currentStage.monsterTypes.length)];
             const monsterData = JSON.parse(JSON.stringify(MONSTERS[monsterId]));
             gameState.monsters.push({
-                ...monsterData,
-                x, y,
+                ...monsterData, x, y,
                 speed: monsterData.stats.agi * 0.2,
                 currentHp: monsterData.stats.hp,
             });
@@ -483,6 +517,8 @@
             sounds.hit = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.05, sustain: 0 } }).toDestination();
             sounds.xp = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
             sounds.levelUp = new Tone.PolySynth(Tone.Synth).toDestination();
+            sounds.throw = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.explosion = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.2 } }).toDestination();
         }
 
         function playSound(effect, options = {}) {
@@ -493,6 +529,8 @@
                 case 'hit': sounds.hit.triggerAttackRelease('8n', now); break;
                 case 'xp': sounds.xp.triggerAttackRelease(options.note || 'A5', '16n', now); break;
                 case 'levelUp': sounds.levelUp.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n', now); break;
+                case 'throw': sounds.throw.triggerAttackRelease('G4', '8n', now); break;
+                case 'explosion': sounds.explosion.triggerAttackRelease('2n', now); break;
             }
         }
         
@@ -546,16 +584,10 @@
             const startY = -camera.y % gridSize;
             
             for(let x = startX; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
             }
             for(let y = startY; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
         }
 
@@ -567,18 +599,26 @@
             gradient.addColorStop(0, char.color);
             gradient.addColorStop(1, 'black');
             ctx.fillStyle = gradient;
-
             ctx.beginPath();
             ctx.arc(char.x - camera.x, char.y - camera.y, char.radius, 0, Math.PI * 2);
             ctx.fill();
         }
 
         function drawPlayer() { 
-            if (Date.now() < gameState.player.invincibleUntil) {
+            const p = gameState.player;
+            if (Date.now() < p.invincibleUntil) {
                 ctx.globalAlpha = 0.5;
             }
-            drawCharacter({...gameState.player, color: '#3b82f6'}); 
+            drawCharacter({...p, color: '#3b82f6'}); 
             ctx.globalAlpha = 1.0;
+            
+            if (p.attackRange > 0) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(p.x - camera.x, p.y - camera.y, p.attackRange, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         }
         function drawMonsters() { gameState.monsters.forEach(m => drawCharacter(m)); }
         
@@ -602,21 +642,22 @@
         
         function drawVFX() {
              gameState.vfx.forEach(v => {
-                ctx.fillStyle = v.color;
+                ctx.save();
                 ctx.globalAlpha = v.opacity;
-                ctx.beginPath();
-                if (v.type === 'aura') {
-                    ctx.arc(v.x - camera.x, v.y - camera.y, v.radius, 0, Math.PI * 2);
-                } else if (v.type === 'chain') {
+                if (v.type === 'chain') {
                     ctx.strokeStyle = v.color;
                     ctx.lineWidth = v.width;
                     ctx.beginPath();
                     ctx.moveTo(v.startX - camera.x, v.startY - camera.y);
                     ctx.lineTo(v.endX - camera.x, v.endY - camera.y);
                     ctx.stroke();
+                } else {
+                    ctx.fillStyle = v.color;
+                    ctx.beginPath();
+                    ctx.arc(v.x - camera.x, v.y - camera.y, v.radius, 0, Math.PI * 2);
+                    ctx.fill();
                 }
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
+                ctx.restore();
             });
         }
 
@@ -624,8 +665,8 @@
         function updatePlayer(now) {
             const p = gameState.player;
             let dx = 0, dy = 0;
-            if (joystick.active) {
-                dx = Math.cos(joystick.angle); dy = Math.sin(joystick.angle);
+            if (moveJoystick.active) {
+                dx = Math.cos(moveJoystick.angle); dy = Math.sin(moveJoystick.angle);
             } else {
                 if (keys['w'] || keys['ArrowUp']) dy = -1;
                 if (keys['s'] || keys['ArrowDown']) dy = 1;
@@ -636,11 +677,10 @@
                 const magnitude = Math.hypot(dx, dy);
                 p.x += (dx / magnitude) * p.speed;
                 p.y += (dy / magnitude) * p.speed;
-                p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
-                p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
             }
+            p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
+            p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
             
-            // Automatic attacks
             p.activeWeapons.forEach(weapon => {
                 if (now > (weapon.lastFired || 0)) {
                     handlePlayerAttack(weapon, now);
@@ -661,9 +701,7 @@
                     p.invincibleUntil = now + 500;
                     createDamageText(p, m.stats.str, '#ff4d4d');
                     anime({ targets: '#player-hit-overlay', opacity: [1, 0], duration: 300, easing: 'easeOutQuad' });
-                    if (p.currentHp <= 0) {
-                        gameOver();
-                    }
+                    if (p.currentHp <= 0) gameOver();
                 }
             });
         }
@@ -691,28 +729,10 @@
         }
         
         function updateVFX(now) {
-            for(let i = gameState.vfx.length - 1; i >= 0; i--) {
+             for (let i = gameState.vfx.length - 1; i >= 0; i--) {
                 const v = gameState.vfx[i];
-                v.duration -= 16; // Approx 1 frame
-                v.opacity = v.duration / v.initialDuration;
-                
-                if (v.type === 'aura') {
-                    v.angle += v.speed;
-                    v.x = gameState.player.x + Math.cos(v.angle) * v.orbitRadius;
-                    v.y = gameState.player.y + Math.sin(v.angle) * v.orbitRadius;
-                    
-                    gameState.monsters.forEach(m => {
-                        if (Math.hypot(v.x - m.x, v.y - m.y) < m.radius + v.radius && now > (m.lastAuraHit || 0)) {
-                            m.currentHp -= v.damage;
-                            m.lastAuraHit = now + 500; // Hit once every 0.5s
-                            createDamageText(m, v.damage, '#ff9900');
-                            playSound('hit');
-                            if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
-                        }
-                    });
-                }
-
-                if (v.duration <= 0) {
+                if (v.update) v.update();
+                if (now > v.destroyTime) {
                     gameState.vfx.splice(i, 1);
                 }
             }
@@ -723,7 +743,7 @@
             for(let i = gameState.xpOrbs.length - 1; i >= 0; i--) {
                 const orb = gameState.xpOrbs[i];
                 const dist = Math.hypot(p.x - orb.x, p.y - orb.y);
-                if (dist < 100) { // Magnet range
+                if (dist < 100) {
                     const angle = Math.atan2(p.y - orb.y, p.x - orb.x);
                     orb.x += Math.cos(angle) * 5;
                     orb.y += Math.sin(angle) * 5;
@@ -744,13 +764,13 @@
             const evolutionLevels = weaponData.evolution.filter(e => weaponInstance.level >= e.level);
             const evolution = evolutionLevels.reduce((acc, val) => ({...acc, ...val}), {});
 
-            weaponInstance.lastFired = now + (weaponData.cooldown / (p.effectiveStats.agi * 0.1));
+            const cooldown = evolution.cooldown || weaponData.cooldown;
+            weaponInstance.lastFired = now + (cooldown / (p.effectiveStats.agi * 0.1));
             const power = weaponData.power * (evolution.power || 1);
             const damage = Math.max(1, Math.floor(p.effectiveStats.str * power));
 
             const findNearestEnemy = (from, exclude = []) => {
-                let nearest = null;
-                let minDistance = Infinity;
+                let nearest = null; let minDistance = Infinity;
                 gameState.monsters.forEach(m => {
                     if (exclude.includes(m)) return;
                     const dist = Math.hypot(from.x - m.x, from.y - m.y);
@@ -762,23 +782,20 @@
                 return { enemy: nearest, distance: minDistance };
             };
 
+            const { enemy: nearestEnemy, distance: nearestDist } = findNearestEnemy(p);
+            if (!nearestEnemy && weaponData.type !== 'pulse_aura' && !weaponData.is360) return;
+            
+            let targetAngle = nearestEnemy ? Math.atan2(nearestEnemy.y - p.y, nearestEnemy.x - p.x) : 0;
+
             switch (weaponData.type) {
                 case 'projectile': {
                     playSound('shoot');
-                    let targetAngle;
-                    if (weaponInstance.id === 'magic_missile') {
-                        const { enemy } = findNearestEnemy(p);
-                        targetAngle = enemy ? Math.atan2(enemy.y - p.y, enemy.x - p.x) : Math.random() * Math.PI * 2;
-                    } else { // For ice shards
-                        targetAngle = Math.random() * Math.PI * 2;
-                    }
-
                     const numProjectiles = evolution.projectiles || weaponData.projectiles || 1;
-                    const angleSpread = weaponData.angleSpread ? (Math.PI * 2) / numProjectiles : (evolution.angleSpread || 0.2);
+                    const angleSpread = weaponData.is360 ? (Math.PI * 2 / numProjectiles) : (evolution.angleSpread || 0.2);
                     const baseAngle = targetAngle - (angleSpread * (numProjectiles - 1)) / 2;
 
                     for (let i = 0; i < numProjectiles; i++) {
-                        const currentAngle = weaponData.angleSpread ? i * angleSpread : baseAngle + i * angleSpread;
+                        const currentAngle = weaponData.is360 ? i * angleSpread + (targetAngle * !weaponData.is360) : baseAngle + i * angleSpread;
                         gameState.projectiles.push({
                             x: p.x, y: p.y,
                             vx: Math.cos(currentAngle) * weaponData.speed,
@@ -792,12 +809,11 @@
                     break;
                 }
                 case 'chain': {
-                    const { enemy } = findNearestEnemy(p);
-                    if (!enemy) return;
+                    if (!nearestEnemy || nearestDist > (evolution.range || weaponData.range)) return;
                     
-                    let currentTarget = enemy;
+                    let currentTarget = nearestEnemy;
                     let lastTarget = p;
-                    const hitEnemies = [enemy];
+                    const hitEnemies = [nearestEnemy];
                     const maxChains = evolution.chains || weaponData.chains;
 
                     for(let i = 0; i < maxChains; i++) {
@@ -806,16 +822,11 @@
                         createDamageText(currentTarget, damage, '#facc15');
                         if (currentTarget.currentHp <= 0) handleMonsterDeath(currentTarget, gameState.monsters.indexOf(currentTarget));
                         
-                        gameState.vfx.push({
-                            type: 'chain', startX: lastTarget.x, startY: lastTarget.y,
-                            endX: currentTarget.x, endY: currentTarget.y,
-                            color: '#facc15', width: 3, opacity: 1,
-                            duration: 100, initialDuration: 100
-                        });
+                        createLineVFX(lastTarget.x, lastTarget.y, currentTarget.x, currentTarget.y, '#facc15', 3, 100);
                         
                         lastTarget = currentTarget;
                         const { enemy: nextTarget } = findNearestEnemy(currentTarget, hitEnemies);
-                        if (nextTarget && Math.hypot(currentTarget.x - nextTarget.x, currentTarget.y - nextTarget.y) < weaponData.range) {
+                        if (nextTarget && Math.hypot(currentTarget.x - nextTarget.x, currentTarget.y - nextTarget.y) < (evolution.range || weaponData.range)) {
                             currentTarget = nextTarget;
                             hitEnemies.push(nextTarget);
                         } else {
@@ -824,19 +835,15 @@
                     }
                     break;
                 }
-                case 'aura': {
-                    const duration = evolution.duration || weaponData.duration;
-                    gameState.vfx.push({
-                        type: 'aura', x: p.x, y: p.y,
-                        radius: evolution.radius || weaponData.radius,
-                        orbitRadius: 80,
-                        angle: Math.random() * Math.PI * 2,
-                        speed: 0.05,
-                        damage: damage,
-                        color: 'rgba(255, 153, 0, 0.5)',
-                        opacity: 1,
-                        duration: duration,
-                        initialDuration: duration
+                case 'pulse_aura': {
+                    const radius = evolution.radius || weaponData.radius;
+                    createExpandingRingVFX(p.x, p.y, radius, '#ff9900', 300);
+                    gameState.monsters.forEach(m => {
+                        if (Math.hypot(p.x - m.x, p.y - m.y) < radius) {
+                            m.currentHp -= damage;
+                            createDamageText(m, damage, '#ff9900');
+                            if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
+                        }
                     });
                     break;
                 }
@@ -846,9 +853,7 @@
         function handleMonsterDeath(monster, index) {
             gameState.killCount++;
             gameState.xpOrbs.push({ x: monster.x, y: monster.y, value: monster.xp, radius: 5 });
-            if (index > -1) {
-                gameState.monsters.splice(index, 1);
-            }
+            if (index > -1) gameState.monsters.splice(index, 1);
             
             const currentStage = STAGES[gameState.stage];
             if (currentStage && !currentStage.bossActive && gameState.killCount >= currentStage.killsToAdvance) {
@@ -898,11 +903,35 @@
             DOMElements.gameOverModal.classList.remove('hidden');
             document.getElementById('restart-game-btn').addEventListener('click', () => {
                 DOMElements.gameOverModal.classList.add('hidden');
-                document.location.reload(); // Simple reload for restart
+                document.location.reload();
             });
         }
+        
+        // --- VFX FACTORY ---
+        function createLineVFX(startX, startY, endX, endY, color, width, duration) {
+            const vfx = {
+                type: 'chain', startX, startY, endX, endY, color, width,
+                opacity: 1,
+                destroyTime: Date.now() + duration,
+                update: function() { this.opacity = (this.destroyTime - Date.now()) / duration; }
+            };
+            gameState.vfx.push(vfx);
+        }
 
-        // --- VFX using anime.js ---
+        function createExpandingRingVFX(x, y, maxRadius, color, duration) {
+            const vfx = {
+                type: 'ring', x, y, radius: 0, color,
+                opacity: 1,
+                destroyTime: Date.now() + duration,
+                update: function() {
+                    const progress = (this.destroyTime - Date.now()) / duration;
+                    this.radius = maxRadius * (1 - progress);
+                    this.opacity = progress;
+                }
+            };
+            gameState.vfx.push(vfx);
+        }
+
         function createDamageText(entity, amount, color) {
             const textEl = document.createElement('div');
             textEl.className = 'damage-text';
@@ -952,57 +981,92 @@
                 await Tone.start();
                 setupSounds();
                 DOMElements.introScreen.classList.add('hidden');
-                renderHeroSelection(); // FIX: Call renderHeroSelection
+                renderHeroSelection();
                 DOMElements.heroSelection.classList.remove('hidden');
             });
 
             window.addEventListener('keydown', e => keys[e.key] = true);
             window.addEventListener('keyup', e => keys[e.key] = false);
 
-            canvas.addEventListener('mousedown', e => mouse.down = true);
-            canvas.addEventListener('mouseup', e => mouse.down = false);
-            canvas.addEventListener('mousemove', e => {
-                mouse.x = e.clientX;
-                mouse.y = e.clientY;
-            });
+            function createJoystickHandler(joystickObj, stickEl) {
+                return function handleTouch(e) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const baseRect = stickEl.parentElement.parentElement.getBoundingClientRect();
+                    const centerX = baseRect.left + baseRect.width / 2;
+                    const centerY = baseRect.top + baseRect.height / 2;
+                    const dx = touch.clientX - centerX;
+                    const dy = touch.clientY - centerY;
+                    
+                    joystickObj.active = true;
+                    joystickObj.angle = Math.atan2(dy, dx);
+                    
+                    const dist = Math.hypot(dx, dy);
+                    const maxDist = baseRect.width / 2 - stickEl.offsetWidth / 2;
+                    const clampedDist = Math.min(dist, maxDist);
+                    const stickX = Math.cos(joystickObj.angle) * clampedDist;
+                    const stickY = Math.sin(joystickObj.angle) * clampedDist;
 
-            const joystickArea = DOMElements.joystickArea;
-            const stick = document.getElementById('joystick-stick');
-            
-            function handleTouch(e) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const baseRect = joystickArea.getBoundingClientRect();
-                const centerX = baseRect.left + baseRect.width / 2;
-                const centerY = baseRect.top + baseRect.height / 2;
-                const dx = touch.clientX - centerX;
-                const dy = touch.clientY - centerY;
-                const dist = Math.hypot(dx, dy);
-                const maxDist = baseRect.width / 2 - stick.offsetWidth / 2;
-
-                joystick.active = true;
-                joystick.angle = Math.atan2(dy, dx);
-                
-                const clampedDist = Math.min(dist, maxDist);
-                const stickX = Math.cos(joystick.angle) * clampedDist;
-                const stickY = Math.sin(joystick.angle) * clampedDist;
-
-                stick.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
+                    stickEl.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
+                }
             }
             
-            joystickArea.addEventListener('touchstart', handleTouch, {passive: false});
-            joystickArea.addEventListener('touchmove', handleTouch, {passive: false});
-            joystickArea.addEventListener('touchend', (e) => {
+            const moveStick = document.getElementById('joystick-stick');
+            const handleMove = createJoystickHandler(moveJoystick, moveStick);
+            DOMElements.joystickArea.addEventListener('touchstart', handleMove, {passive: false});
+            DOMElements.joystickArea.addEventListener('touchmove', handleMove, {passive: false});
+            DOMElements.joystickArea.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                joystick.active = false;
-                stick.style.transform = 'translate(-50%, -50%)';
+                moveJoystick.active = false;
+                moveStick.style.transform = 'translate(-50%, -50%)';
             });
-            
-            const attackBtn = DOMElements.attackButtonArea;
-            attackBtn.addEventListener('touchstart', e => { e.preventDefault(); mouse.down = true; });
-            attackBtn.addEventListener('touchend', e => { e.preventDefault(); mouse.down = false; });
+
+            const skillStick = document.getElementById('skill-joystick-stick');
+            const handleSkill = createJoystickHandler(skillJoystick, skillStick);
+            DOMElements.skillJoystickArea.addEventListener('touchstart', handleSkill, {passive: false});
+            DOMElements.skillJoystickArea.addEventListener('touchmove', handleSkill, {passive: false});
+            DOMElements.skillJoystickArea.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                throwGrenade(skillJoystick.angle);
+                skillJoystick.active = false;
+                skillStick.style.transform = 'translate(-50%, -50%)';
+            });
         }
         
+        function throwGrenade(angle) {
+            const p = gameState.player;
+            const now = Date.now();
+            if (!p || now < p.grenade.lastUsed + p.grenade.cooldown) return;
+
+            p.grenade.lastUsed = now;
+            playSound('throw');
+
+            const targetX = p.x + Math.cos(angle) * p.grenade.throwRange;
+            const targetY = p.y + Math.sin(angle) * p.grenade.throwRange;
+            
+            // Landing indicator
+            createExpandingRingVFX(targetX, targetY, p.grenade.blastRadius, 'rgba(255, 100, 100, 0.5)', p.grenade.fuse);
+
+            setTimeout(() => {
+                detonateGrenade(targetX, targetY);
+            }, p.grenade.fuse);
+        }
+        
+        function detonateGrenade(x, y) {
+            const p = gameState.player;
+            playSound('explosion');
+            createExpandingRingVFX(x, y, p.grenade.blastRadius, 'rgba(255, 150, 0, 0.8)', 400);
+
+            const damage = Math.floor(p.effectiveStats.str * p.grenade.power);
+            gameState.monsters.forEach(m => {
+                if (Math.hypot(x - m.x, y - m.y) < p.grenade.blastRadius) {
+                    m.currentHp -= damage;
+                    createDamageText(m, damage, '#ff9900');
+                    if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
+                }
+            });
+        }
+
         function renderHeroSelection() {
             const container = DOMElements.heroSelection;
             container.innerHTML = `<div class="modal-panel text-center">
@@ -1026,9 +1090,10 @@
                         <h3 class="font-cinzel text-lg text-yellow-400">${hero.name}</h3>
                         <p class="text-xs text-gray-400 mt-2 h-12">${description}</p>
                     </div>
-                    <div class="text-sm text-gray-200 mt-4 border-t border-gray-600 pt-2 grid grid-cols-3 gap-1 text-center">
+                    <div class="text-sm text-gray-200 mt-4 border-t border-gray-600 pt-2 grid grid-cols-4 gap-1 text-center">
                         <span class="text-red-400">HP: ${hero.baseStats.hp}</span>
                         <span class="text-orange-400">STR: ${hero.baseStats.str}</span>
+                        <span class="text-green-400">VIT: ${hero.baseStats.vit}</span>
                         <span class="text-blue-400">AGI: ${hero.baseStats.agi}</span>
                     </div>`;
                 card.addEventListener('click', () => startGame(id));
@@ -1044,6 +1109,10 @@
             DOMElements.xpBar.style.width = `${(p.xp / p.xpToNextLevel) * 100}%`;
             DOMElements.levelText.textContent = `LV. ${p.level}`;
             
+            const now = Date.now();
+            const cooldownProgress = Math.min(1, (now - p.grenade.lastUsed) / p.grenade.cooldown);
+            DOMElements.skillCooldownOverlay.style.clipPath = `inset(${100 - cooldownProgress * 100}% 0 0 0)`;
+
             const currentStage = STAGES[gameState.stage];
             if(currentStage) {
                 const kills = currentStage.bossActive ? currentStage.killsToAdvance : gameState.killCount;
@@ -1058,9 +1127,7 @@
             const existingWeapons = p.activeWeapons.map(w => w.id);
             const newWeaponPool = UPGRADE_POOL.filter(wId => !existingWeapons.includes(wId));
             
-            // Create a pool of possible upgrades
             let upgradeOptions = [];
-            // Add existing weapons that can be upgraded
             p.activeWeapons.forEach(w => {
                 const weaponData = WEAPONS[w.id];
                 const maxLevel = weaponData.evolution.length > 0 ? Math.max(...weaponData.evolution.map(e => e.level)) : 1;
@@ -1068,18 +1135,15 @@
                     upgradeOptions.push({ id: w.id, level: w.level, isNew: false });
                 }
             });
-            // Add new weapons if available
             if (newWeaponPool.length > 0 && p.activeWeapons.length < 6) {
                  newWeaponPool.forEach(wId => {
                      upgradeOptions.push({ id: wId, level: 0, isNew: true });
                  });
             }
 
-            // Randomly pick 3 choices
             while(choices.length < 3 && upgradeOptions.length > 0) {
                 const randIndex = Math.floor(Math.random() * upgradeOptions.length);
-                const chosen = upgradeOptions.splice(randIndex, 1)[0];
-                choices.push(chosen);
+                choices.push(upgradeOptions.splice(randIndex, 1)[0]);
             }
 
             DOMElements.levelUpModal.innerHTML = `<div class="modal-panel">
@@ -1115,6 +1179,7 @@
                         const weaponToUpgrade = p.activeWeapons.find(w => w.id === weaponId);
                         if(weaponToUpgrade) weaponToUpgrade.level++;
                     }
+                    recalculatePlayerStats();
                     DOMElements.levelUpModal.classList.add('hidden');
                     gameState.isPaused = false;
                 });
