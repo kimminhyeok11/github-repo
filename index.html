@@ -206,20 +206,16 @@
 
 
         /* Mobile Controls */
-        #joystick-area, #skill-joystick-area {
+        .joystick-container {
             position: fixed;
-            bottom: 20px;
-            width: 150px;
-            height: 150px;
-            z-index: 50;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
-        #joystick-area { left: 20px; }
-        #skill-joystick-area { right: 20px; }
-
         .control-base {
             position: absolute;
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             background: rgba(0,0,0,0.3);
             border-radius: 50%;
             left: 50%;
@@ -229,8 +225,8 @@
         }
         .control-stick {
             position: absolute;
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             background: rgba(255,255,255,0.4);
             border-radius: 50%;
             left: 50%;
@@ -239,8 +235,8 @@
         }
         #skill-cooldown-overlay {
             position: absolute;
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             left: 50%;
             top: 50%;
@@ -317,11 +313,11 @@
             <div id="health-orb-text" class="orb-text"></div>
         </div>
         
-        <div id="joystick-area" class="hidden">
+        <div id="joystick-area" class="joystick-container">
             <div class="control-base"></div>
             <div id="joystick-stick" class="control-stick"></div>
         </div>
-        <div id="skill-joystick-area" class="hidden">
+        <div id="skill-joystick-area" class="joystick-container">
             <div class="control-base">
                 <div id="skill-cooldown-overlay"></div>
             </div>
@@ -409,8 +405,8 @@
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         let camera = { x: 0, y: 0 };
-        let moveJoystick = { active: false, dx: 0, dy: 0 };
-        let skillJoystick = { active: false, angle: 0, intensity: 0 };
+        let moveJoystick = { active: false, dx: 0, dy: 0, touchId: null, startX: 0, startY: 0 };
+        let skillJoystick = { active: false, angle: 0, intensity: 0, touchId: null, startX: 0, startY: 0 };
         const keys = {};
         const MAP_SIZE = { width: 3000, height: 3000 };
         let sounds = {};
@@ -438,7 +434,9 @@
             stageProgress: document.getElementById('stage-progress-bar'),
             stageText: document.getElementById('stage-text'),
             joystickArea: document.getElementById('joystick-area'),
+            joystickStick: document.getElementById('joystick-stick'),
             skillJoystickArea: document.getElementById('skill-joystick-area'),
+            skillJoystickStick: document.getElementById('skill-joystick-stick'),
             skillCooldownOverlay: document.getElementById('skill-cooldown-overlay'),
             topUI: document.getElementById('top-ui'),
             bottomUI: document.getElementById('game-ui-bottom'),
@@ -488,8 +486,6 @@
             DOMElements.topUI.classList.remove('hidden');
             DOMElements.bottomUI.classList.remove('hidden');
             DOMElements.healthOrb.classList.remove('hidden');
-            DOMElements.joystickArea.classList.remove('hidden');
-            DOMElements.skillJoystickArea.classList.remove('hidden');
             
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             gameLoop();
@@ -499,7 +495,7 @@
             const p = gameState.player;
             p.effectiveStats = { ...p.baseStats };
             p.effectiveStats.hp = (p.baseStats.hp + (p.effectiveStats.vit * 10)) * p.statBonuses.hp;
-            p.speed = p.baseStats.speed * p.statBonuses.speed;
+            p.speed = 3 * p.statBonuses.speed; // Base speed is 3
             if (p.currentHp === undefined || p.currentHp > p.effectiveStats.hp) p.currentHp = p.effectiveStats.hp;
             
             p.attackRange = 0;
@@ -530,7 +526,7 @@
             const diff = gameState.difficulty;
             monsterData.stats.hp *= diff;
             monsterData.stats.str *= diff;
-            monsterData.speed = (monsterData.stats.agi * 0.2) * Math.min(1.5, diff); // Cap speed increase
+            monsterData.speed = (MONSTERS[monsterId].stats.agi * 0.2) * Math.min(1.5, diff); // Cap speed increase
 
             gameState.monsters.push({
                 ...monsterData, x, y,
@@ -1168,65 +1164,86 @@
             window.addEventListener('keydown', e => keys[e.key] = true);
             window.addEventListener('keyup', e => keys[e.key] = false);
 
-            function createJoystickHandler(joystickObj, stickEl, isMovement) {
-                return function handleTouch(e) {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    const baseRect = stickEl.parentElement.parentElement.getBoundingClientRect();
-                    const centerX = baseRect.left + baseRect.width / 2;
-                    const centerY = baseRect.top + baseRect.height / 2;
-                    const dx = touch.clientX - centerX;
-                    const dy = touch.clientY - centerY;
-                    
-                    joystickObj.active = true;
-                    
-                    const dist = Math.hypot(dx, dy);
-                    const angle = Math.atan2(dy, dx);
-                    
-                    if (isMovement) {
-                        if (dist > 0) {
-                            joystickObj.dx = dx / dist;
-                            joystickObj.dy = dy / dist;
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                for (const touch of e.changedTouches) {
+                    if (touch.clientX < window.innerWidth / 2) {
+                        if (moveJoystick.touchId === null) {
+                            moveJoystick.touchId = touch.identifier;
+                            moveJoystick.startX = touch.clientX;
+                            moveJoystick.startY = touch.clientY;
+                            DOMElements.joystickArea.style.left = `${touch.clientX}px`;
+                            DOMElements.joystickArea.style.top = `${touch.clientY}px`;
+                            DOMElements.joystickArea.style.transform = `translate(-50%, -50%)`;
+                            DOMElements.joystickArea.style.opacity = '1';
                         }
                     } else {
-                        joystickObj.angle = angle;
-                        const maxDist = (baseRect.width / 2);
-                        const clampedDist = Math.min(dist, maxDist);
-                        joystickObj.intensity = clampedDist / maxDist;
+                        if (skillJoystick.touchId === null) {
+                            skillJoystick.touchId = touch.identifier;
+                            skillJoystick.startX = touch.clientX;
+                            skillJoystick.startY = touch.clientY;
+                            DOMElements.skillJoystickArea.style.left = `${touch.clientX}px`;
+                            DOMElements.skillJoystickArea.style.top = `${touch.clientY}px`;
+                            DOMElements.skillJoystickArea.style.transform = `translate(-50%, -50%)`;
+                            DOMElements.skillJoystickArea.style.opacity = '1';
+                        }
                     }
-
-                    const stickMaxDist = (baseRect.width / 2) - (stickEl.offsetWidth / 2);
-                    const stickClamped = Math.min(dist, stickMaxDist);
-                    const stickX = Math.cos(angle) * stickClamped;
-                    const stickY = Math.sin(angle) * stickClamped;
-
-                    stickEl.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
                 }
-            }
-            
-            const moveStick = document.getElementById('joystick-stick');
-            const handleMove = createJoystickHandler(moveJoystick, moveStick, true);
-            DOMElements.joystickArea.addEventListener('touchstart', handleMove, {passive: false});
-            DOMElements.joystickArea.addEventListener('touchmove', handleMove, {passive: false});
-            DOMElements.joystickArea.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                moveJoystick.active = false;
-                moveJoystick.dx = 0;
-                moveJoystick.dy = 0;
-                moveStick.style.transform = 'translate(-50%, -50%)';
-            });
+            }, { passive: false });
 
-            const skillStick = document.getElementById('skill-joystick-stick');
-            const handleSkill = createJoystickHandler(skillJoystick, skillStick, false);
-            DOMElements.skillJoystickArea.addEventListener('touchstart', handleSkill, {passive: false});
-            DOMElements.skillJoystickArea.addEventListener('touchmove', handleSkill, {passive: false});
-            DOMElements.skillJoystickArea.addEventListener('touchend', (e) => {
+            canvas.addEventListener('touchmove', (e) => {
                 e.preventDefault();
-                throwGrenade(skillJoystick.angle, skillJoystick.intensity);
-                skillJoystick.active = false;
-                skillJoystick.intensity = 0;
-                skillStick.style.transform = 'translate(-50%, -50%)';
-            });
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier === moveJoystick.touchId) {
+                        const dx = touch.clientX - moveJoystick.startX;
+                        const dy = touch.clientY - moveJoystick.startY;
+                        const dist = Math.hypot(dx, dy);
+                        moveJoystick.active = true;
+                        if (dist > 0) {
+                            moveJoystick.dx = dx / dist;
+                            moveJoystick.dy = dy / dist;
+                        }
+                        const stickMaxDist = 50;
+                        const stickClamped = Math.min(dist, stickMaxDist);
+                        const stickX = (dx / dist) * stickClamped;
+                        const stickY = (dy / dist) * stickClamped;
+                        DOMElements.joystickStick.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
+                    } else if (touch.identifier === skillJoystick.touchId) {
+                        const dx = touch.clientX - skillJoystick.startX;
+                        const dy = touch.clientY - skillJoystick.startY;
+                        const dist = Math.hypot(dx, dy);
+                        skillJoystick.active = true;
+                        skillJoystick.angle = Math.atan2(dy, dx);
+                        const maxDist = 50;
+                        const clampedDist = Math.min(dist, maxDist);
+                        skillJoystick.intensity = clampedDist / maxDist;
+                        const stickX = (dx / dist) * clampedDist;
+                        const stickY = (dy / dist) * clampedDist;
+                        DOMElements.skillJoystickStick.style.transform = `translate(-50%, -50%) translate(${stickX}px, ${stickY}px)`;
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier === moveJoystick.touchId) {
+                        moveJoystick.active = false;
+                        moveJoystick.touchId = null;
+                        moveJoystick.dx = 0;
+                        moveJoystick.dy = 0;
+                        DOMElements.joystickArea.style.opacity = '0';
+                        DOMElements.joystickStick.style.transform = 'translate(-50%, -50%)';
+                    } else if (touch.identifier === skillJoystick.touchId) {
+                        throwGrenade(skillJoystick.angle, skillJoystick.intensity);
+                        skillJoystick.active = false;
+                        skillJoystick.touchId = null;
+                        skillJoystick.intensity = 0;
+                        DOMElements.skillJoystickArea.style.opacity = '0';
+                        DOMElements.skillJoystickStick.style.transform = 'translate(-50%, -50%)';
+                    }
+                }
+            }, { passive: false });
         }
         
         function throwGrenade(angle, intensity) {
@@ -1253,7 +1270,7 @@
             playSound('explosion');
             createExpandingRingVFX(x, y, p.grenade.blastRadius, 'rgba(255, 150, 0, 0.8)', 400);
 
-            const damage = Math.floor(p.effectiveStats.str * p.grenade.power);
+            const damage = Math.floor(p.effectiveStats.str * p.grenade.power * p.statBonuses.power);
             gameState.monsters.forEach(m => {
                 if (Math.hypot(x - m.x, y - m.y) < p.grenade.blastRadius) {
                     m.currentHp -= damage;
