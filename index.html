@@ -392,8 +392,8 @@
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         let camera = { x: 0, y: 0 };
-        let moveJoystick = { active: false, angle: 0 };
-        let skillJoystick = { active: false, angle: 0 };
+        let moveJoystick = { active: false, angle: 0, intensity: 0 };
+        let skillJoystick = { active: false, angle: 0, intensity: 0 };
         const keys = {};
         const MAP_SIZE = { width: 3000, height: 3000 };
         let sounds = {};
@@ -571,6 +571,7 @@
             drawVFX();
             drawMonsters();
             drawPlayer();
+            drawGrenadeTrajectory();
             updateUI();
         }
 
@@ -661,12 +662,43 @@
             });
         }
 
+        function drawGrenadeTrajectory() {
+            if (!skillJoystick.active || !gameState.player) return;
+
+            const p = gameState.player;
+            const startX = p.x - camera.x;
+            const startY = p.y - camera.y;
+            
+            const endX = p.x + Math.cos(skillJoystick.angle) * p.grenade.throwRange - camera.x;
+            const endY = p.y + Math.sin(skillJoystick.angle) * p.grenade.throwRange - camera.y;
+
+            ctx.save();
+            ctx.setLineDash([10, 10]);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Draw landing circle
+            ctx.beginPath();
+            ctx.arc(endX, endY, p.grenade.blastRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         // --- UPDATE LOGIC ---
         function updatePlayer(now) {
             const p = gameState.player;
             let dx = 0, dy = 0;
+            let speedMultiplier = 1.0;
+
             if (moveJoystick.active) {
-                dx = Math.cos(moveJoystick.angle); dy = Math.sin(moveJoystick.angle);
+                dx = Math.cos(moveJoystick.angle);
+                dy = Math.sin(moveJoystick.angle);
+                speedMultiplier = moveJoystick.intensity;
             } else {
                 if (keys['w'] || keys['ArrowUp']) dy = -1;
                 if (keys['s'] || keys['ArrowDown']) dy = 1;
@@ -675,8 +707,9 @@
             }
             if (dx !== 0 || dy !== 0) {
                 const magnitude = Math.hypot(dx, dy);
-                p.x += (dx / magnitude) * p.speed;
-                p.y += (dy / magnitude) * p.speed;
+                const currentSpeed = p.speed * speedMultiplier;
+                p.x += (dx / magnitude) * currentSpeed;
+                p.y += (dy / magnitude) * currentSpeed;
             }
             p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
             p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
@@ -1004,6 +1037,8 @@
                     const dist = Math.hypot(dx, dy);
                     const maxDist = baseRect.width / 2 - stickEl.offsetWidth / 2;
                     const clampedDist = Math.min(dist, maxDist);
+                    joystickObj.intensity = clampedDist / maxDist;
+
                     const stickX = Math.cos(joystickObj.angle) * clampedDist;
                     const stickY = Math.sin(joystickObj.angle) * clampedDist;
 
@@ -1018,6 +1053,7 @@
             DOMElements.joystickArea.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 moveJoystick.active = false;
+                moveJoystick.intensity = 0;
                 moveStick.style.transform = 'translate(-50%, -50%)';
             });
 
