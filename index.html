@@ -350,7 +350,7 @@
         };
         const WEAPONS = {
             magic_missile: { 
-                name: "매직 미사일", type: 'projectile', power: 1.0, speed: 7, size: 5, cooldown: 500,
+                name: "매직 미사일", type: 'projectile', power: 1.0, speed: 7, size: 5, cooldown: 500, maxLevel: 4,
                 description: "가장 가까운 적에게 미사일을 발사합니다.",
                 evolution: [
                     { level: 2, projectiles: 2, description: "발사체 2개로 증가" }, 
@@ -359,33 +359,50 @@
                 ]
             },
             chain_lightning: {
-                name: "체인 라이트닝", type: 'chain', power: 0.8, cooldown: 2000, chains: 3, range: 150,
+                name: "체인 라이트닝", type: 'chain', power: 0.8, cooldown: 2000, chains: 3, range: 150, maxLevel: 4,
                 description: "적에게 튕기는 번개를 발사합니다.",
                 evolution: [ { level: 2, chains: 5, description: "최대 5번 연쇄" }, { level: 3, power: 1.2, description: "공격력 증가" }, { level: 4, chains: 7, range: 200, description: "최대 7번 연쇄, 범위 증가" } ]
             },
             fire_pulse: {
-                name: "화염 파동", type: 'pulse_aura', power: 0.3, cooldown: 2500, radius: 120,
+                name: "화염 파동", type: 'pulse_aura', power: 0.3, cooldown: 2500, radius: 120, maxLevel: 4,
                 description: "주기적으로 주변에 화염 파동을 방출하여 피해를 줍니다.",
                 evolution: [ { level: 2, radius: 150, description: "범위 증가" }, { level: 3, power: 0.5, description: "공격력 증가" }, { level: 4, cooldown: 2000, description: "쿨타임 감소" } ]
             },
             ice_shards: {
-                name: "얼음 파편", type: 'projectile', power: 0.7, speed: 6, size: 4, cooldown: 1500, projectiles: 8, is360: true,
+                name: "얼음 파편", type: 'projectile', power: 0.7, speed: 6, size: 4, cooldown: 1500, projectiles: 8, is360: true, maxLevel: 4,
                 description: "모든 방향으로 얼음 파편을 발사합니다.",
                 evolution: [ { level: 2, projectiles: 12, description: "파편 12개로 증가" }, { level: 3, power: 1.0, description: "공격력 증가" }, { level: 4, projectiles: 16, description: "파편 16개로 증가" } ]
+            },
+            holy_water: {
+                name: "성수", type: 'ground_aoe', power: 0.6, cooldown: 3000, radius: 80, duration: 4000, maxLevel: 4,
+                description: "성수 병을 던져 신성한 지대를 생성합니다.",
+                evolution: [
+                    { level: 2, power: 0.8, description: "공격력 증가" },
+                    { level: 3, radius: 100, description: "범위 증가" },
+                    { level: 4, duration: 6000, description: "지속시간 증가" }
+                ]
             }
         };
         const MONSTERS = {
             goblin: { name: "고블린", stats: { hp: 80, str: 12, vit: 5, agi: 5 }, xp: 25, radius: 12, color: '#964B00' },
             bat: { name: "박쥐", stats: { hp: 50, str: 8, vit: 2, agi: 8 }, xp: 15, radius: 10, color: '#4B0082' },
             ogre: { name: "오우거", stats: { hp: 250, str: 25, vit: 10, agi: 3 }, xp: 50, radius: 20, color: '#808080' },
-            cyclops: { name: "사이클롭스", stats: { hp: 1000, str: 40, vit: 15, agi: 2 }, xp: 200, radius: 30, color: '#D2691E' }
+            cyclops: { name: "사이클롭스", stats: { hp: 1000, str: 40, vit: 15, agi: 2 }, xp: 200, radius: 30, color: '#D2691E' },
+            skeleton: { name: "스켈레톤", stats: { hp: 150, str: 20, vit: 8, agi: 4 }, xp: 40, radius: 14, color: '#E0E0E0' },
+            slime: { name: "슬라임", stats: { hp: 100, str: 15, vit: 10, agi: 3 }, xp: 20, radius: 15, color: '#34D399', splits: true },
+            mini_slime: { name: "미니 슬라임", stats: { hp: 30, str: 8, vit: 2, agi: 5 }, xp: 5, radius: 8, color: '#6EE7B7' },
+            minotaur: { name: "미노타우로스", stats: { hp: 2500, str: 60, vit: 25, agi: 3 }, xp: 1000, radius: 35, color: '#A0522D' }
         };
         const STAGES = [
-            { killsToAdvance: 20, monsterTypes: ['goblin'] },
-            { killsToAdvance: 30, monsterTypes: ['goblin', 'bat'] },
-            { killsToAdvance: 1, monsterTypes: ['goblin', 'bat', 'ogre'], boss: 'cyclops' },
+            { duration: 60, monsterTypes: ['goblin'], difficulty: 1.0 },
+            { duration: 80, monsterTypes: ['goblin', 'bat'], difficulty: 1.2 },
+            { duration: 1, monsterTypes: [], boss: 'cyclops', difficulty: 1.5 },
+            { duration: 90, monsterTypes: ['bat', 'skeleton'], difficulty: 1.8 },
+            { duration: 100, monsterTypes: ['skeleton', 'slime'], difficulty: 2.2 },
+            { duration: 1, monsterTypes: [], boss: 'minotaur', difficulty: 2.5 },
+            { duration: Infinity, monsterTypes: ['goblin', 'bat', 'skeleton', 'slime', 'ogre'], difficulty: 3.0 } // Endless Horde mode
         ];
-        const UPGRADE_POOL = ['chain_lightning', 'fire_pulse', 'ice_shards'];
+        const UPGRADE_POOL = ['chain_lightning', 'fire_pulse', 'ice_shards', 'holy_water'];
 
         // --- GAME STATE & SETUP ---
         let gameState = {};
@@ -398,6 +415,7 @@
         const MAP_SIZE = { width: 3000, height: 3000 };
         let sounds = {};
         let animationFrameId;
+        let lastHitSoundTime = 0;
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -443,6 +461,7 @@
                     activeWeapons: [{ id: 'magic_missile', level: 1, lastFired: 0 }],
                     invincibleUntil: 0,
                     attackRange: 0,
+                    statBonuses: { hp: 1, power: 1, speed: 1 },
                     grenade: {
                         cooldown: 8000,
                         lastUsed: -8000,
@@ -457,6 +476,8 @@
                 projectiles: [],
                 vfx: [],
                 stage: 0,
+                stageStartTime: Date.now(),
+                difficulty: 1.0,
                 killCount: 0,
                 isPaused: false,
                 isGameOver: false,
@@ -477,7 +498,8 @@
         function recalculatePlayerStats() {
             const p = gameState.player;
             p.effectiveStats = { ...p.baseStats };
-            p.effectiveStats.hp = p.baseStats.hp + (p.effectiveStats.vit * 10);
+            p.effectiveStats.hp = (p.baseStats.hp + (p.effectiveStats.vit * 10)) * p.statBonuses.hp;
+            p.speed = p.baseStats.speed * p.statBonuses.speed;
             if (p.currentHp === undefined || p.currentHp > p.effectiveStats.hp) p.currentHp = p.effectiveStats.hp;
             
             p.attackRange = 0;
@@ -495,7 +517,7 @@
         function spawnMonster() {
             if (!gameState.player) return;
             const currentStage = STAGES[gameState.stage];
-            if (!currentStage || currentStage.bossActive) return;
+            if (!currentStage || currentStage.boss) return;
 
             const angle = Math.random() * Math.PI * 2;
             const radius = Math.max(canvas.width, canvas.height) / 2 + 50;
@@ -504,18 +526,29 @@
             
             const monsterId = currentStage.monsterTypes[Math.floor(Math.random() * currentStage.monsterTypes.length)];
             const monsterData = JSON.parse(JSON.stringify(MONSTERS[monsterId]));
+            
+            const diff = gameState.difficulty;
+            monsterData.stats.hp *= diff;
+            monsterData.stats.str *= diff;
+            monsterData.speed = (monsterData.stats.agi * 0.2) * Math.min(1.5, diff); // Cap speed increase
+
             gameState.monsters.push({
                 ...monsterData, x, y,
-                speed: monsterData.stats.agi * 0.2,
                 currentHp: monsterData.stats.hp,
             });
         }
         
         // --- SOUND MANAGER ---
         function setupSounds() {
-            sounds.shoot = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 } }).toDestination();
+            sounds.shoot = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 }
+            }).toDestination();
             sounds.hit = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.05, sustain: 0 } }).toDestination();
-            sounds.xp = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.xp = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+            }).toDestination();
             sounds.levelUp = new Tone.PolySynth(Tone.Synth).toDestination();
             sounds.throw = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } }).toDestination();
             sounds.explosion = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.2 } }).toDestination();
@@ -523,14 +556,32 @@
 
         function playSound(effect, options = {}) {
             if (!sounds[effect] || Tone.context.state !== 'running') return;
-            const now = Tone.now();
+            
             switch (effect) {
-                case 'shoot': sounds.shoot.triggerAttackRelease('C5', '16n', now); break;
-                case 'hit': sounds.hit.triggerAttackRelease('8n', now); break;
-                case 'xp': sounds.xp.triggerAttackRelease(options.note || 'A5', '16n', now); break;
-                case 'levelUp': sounds.levelUp.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n', now); break;
-                case 'throw': sounds.throw.triggerAttackRelease('G4', '8n', now); break;
-                case 'explosion': sounds.explosion.triggerAttackRelease('2n', now); break;
+                case 'shoot': 
+                    sounds.shoot.triggerAttackRelease('C5', '16n'); 
+                    break;
+                case 'hit': 
+                    {
+                        const now = Tone.now();
+                        if (now - lastHitSoundTime > 0.05) { // Throttle hit sound
+                            sounds.hit.triggerAttackRelease('8n');
+                            lastHitSoundTime = now;
+                        }
+                    }
+                    break;
+                case 'xp': 
+                    sounds.xp.triggerAttackRelease(options.note || 'A5', '16n'); 
+                    break;
+                case 'levelUp': 
+                    sounds.levelUp.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n'); 
+                    break;
+                case 'throw': 
+                    sounds.throw.triggerAttackRelease('G4', '8n'); 
+                    break;
+                case 'explosion': 
+                    sounds.explosion.triggerAttackRelease('2n'); 
+                    break;
             }
         }
         
@@ -542,7 +593,7 @@
             const now = Date.now();
             if (!gameState.isPaused) {
                 update(now);
-                if (now - lastSpawnTime > (1000 - gameState.stage * 100)) {
+                if (now - lastSpawnTime > (500 - gameState.stage * 50)) { // Spawn rate increases with stage
                     spawnMonster();
                     lastSpawnTime = now;
                 }
@@ -552,6 +603,7 @@
         }
 
         function update(now) {
+            updateStage(now);
             updatePlayer(now);
             updateMonsters(now);
             updateProjectiles();
@@ -565,8 +617,7 @@
             camera.x = gameState.player.x - canvas.width / 2;
             camera.y = gameState.player.y - canvas.height / 2;
             
-            // OPTIMIZATION: Create camera bounds for culling
-            const buffer = 50; // 50px buffer to prevent pop-in
+            const buffer = 50;
             const cameraBounds = {
                 left: camera.x - buffer,
                 right: camera.x + canvas.width + buffer,
@@ -719,6 +770,38 @@
         }
 
         // --- UPDATE LOGIC ---
+        function updateStage(now) {
+            const currentStageData = STAGES[gameState.stage];
+            if (!currentStageData) return;
+
+            gameState.difficulty = currentStageData.difficulty;
+            if (currentStageData.duration === Infinity) {
+                // Increase difficulty over time in endless mode
+                gameState.difficulty += (now - gameState.stageStartTime) / (1000 * 300); // Increase every 5 mins
+            }
+
+            if (currentStageData.boss) {
+                const bossExists = gameState.monsters.some(m => m.name === MONSTERS[currentStageData.boss].name);
+                if (!bossExists && gameState.monsters.length === 0) {
+                    advanceStage(now);
+                }
+            } else {
+                const elapsedTime = (now - gameState.stageStartTime) / 1000;
+                if (elapsedTime >= currentStageData.duration) {
+                    advanceStage(now);
+                }
+            }
+        }
+
+        function advanceStage(now) {
+            gameState.stage++;
+            gameState.stageStartTime = now;
+            const nextStage = STAGES[gameState.stage];
+            if (nextStage && nextStage.boss) {
+                spawnBoss(nextStage.boss);
+            }
+        }
+
         function updatePlayer(now) {
             const p = gameState.player;
             let dx = 0, dy = 0;
@@ -733,8 +816,9 @@
                 if (keys['d'] || keys['ArrowRight']) dx = 1;
             }
             if (dx !== 0 || dy !== 0) {
-                p.x += dx * p.speed;
-                p.y += dy * p.speed;
+                const magnitude = Math.hypot(dx, dy); // Normalize keyboard input
+                p.x += (dx / magnitude) * p.speed;
+                p.y += (dy / magnitude) * p.speed;
             }
             p.x = Math.max(p.radius, Math.min(MAP_SIZE.width - p.radius, p.x));
             p.y = Math.max(p.radius, Math.min(MAP_SIZE.height - p.radius, p.y));
@@ -789,7 +873,7 @@
         function updateVFX(now) {
              for (let i = gameState.vfx.length - 1; i >= 0; i--) {
                 const v = gameState.vfx[i];
-                if (v.update) v.update();
+                if (v.update) v.update(now);
                 if (now > v.destroyTime) {
                     gameState.vfx.splice(i, 1);
                 }
@@ -824,7 +908,7 @@
 
             const cooldown = evolution.cooldown || weaponData.cooldown;
             weaponInstance.lastFired = now + (cooldown / (p.effectiveStats.agi * 0.1));
-            const power = weaponData.power * (evolution.power || 1);
+            const power = weaponData.power * (evolution.power || 1) * p.statBonuses.power;
             const damage = Math.max(1, Math.floor(p.effectiveStats.str * power));
 
             const findNearestEnemy = (from, exclude = [], maxRange = Infinity) => {
@@ -841,7 +925,7 @@
             };
 
             const { enemy: nearestEnemy, distance: nearestDist } = findNearestEnemy(p, [], canvas.width);
-            if (!nearestEnemy && weaponData.type !== 'pulse_aura' && !weaponData.is360) return;
+            if (!nearestEnemy && !['pulse_aura', 'ground_aoe'].includes(weaponData.type) && !weaponData.is360) return;
             
             let targetAngle = nearestEnemy ? Math.atan2(nearestEnemy.y - p.y, nearestEnemy.x - p.x) : 0;
 
@@ -905,28 +989,41 @@
                     }
                     break;
                 }
+                case 'ground_aoe': {
+                    const targetPos = nearestEnemy ? {x: nearestEnemy.x, y: nearestEnemy.y} : {x: p.x + (Math.random() - 0.5) * 200, y: p.y + (Math.random() - 0.5) * 200};
+                    createGroundAoeVFX(targetPos.x, targetPos.y, evolution.radius || weaponData.radius, 'rgba(173, 216, 230, 0.5)', evolution.duration || weaponData.duration, damage);
+                    break;
+                }
             }
         }
         
         function handleMonsterDeath(monster, index) {
             gameState.killCount++;
             gameState.xpOrbs.push({ x: monster.x, y: monster.y, value: monster.xp, radius: 5 });
-            if (index > -1) gameState.monsters.splice(index, 1);
             
-            const currentStage = STAGES[gameState.stage];
-            if (currentStage && !currentStage.bossActive && gameState.killCount >= currentStage.killsToAdvance) {
-                if(currentStage.boss) {
-                    spawnBoss(currentStage.boss);
-                    currentStage.bossActive = true;
-                } else {
-                    gameState.stage++;
-                    gameState.killCount = 0;
+            if (monster.splits) {
+                const numSplits = 2;
+                for (let i = 0; i < numSplits; i++) {
+                    const miniSlimeData = JSON.parse(JSON.stringify(MONSTERS['mini_slime']));
+                    gameState.monsters.push({
+                        ...miniSlimeData,
+                        x: monster.x + (Math.random() - 0.5) * 20,
+                        y: monster.y + (Math.random() - 0.5) * 20,
+                        speed: miniSlimeData.stats.agi * 0.2,
+                        currentHp: miniSlimeData.stats.hp,
+                    });
                 }
             }
+
+            if (index > -1) gameState.monsters.splice(index, 1);
         }
 
         function spawnBoss(bossId) {
             const monsterData = JSON.parse(JSON.stringify(MONSTERS[bossId]));
+            const diff = gameState.difficulty;
+            monsterData.stats.hp *= diff;
+            monsterData.stats.str *= diff;
+
             gameState.monsters.push({
                 ...monsterData,
                 x: gameState.player.x + 300, y: gameState.player.y,
@@ -969,7 +1066,7 @@
         function createLineVFX(startX, startY, endX, endY, color, width, duration) {
             const vfx = {
                 type: 'chain', startX, startY, endX, endY, color, width,
-                opacity: 1,
+                opacity: 1, x: (startX + endX) / 2, y: (startY + endY) / 2,
                 destroyTime: Date.now() + duration,
                 update: function() { this.opacity = (this.destroyTime - Date.now()) / duration; }
             };
@@ -985,6 +1082,31 @@
                     const progress = (this.destroyTime - Date.now()) / duration;
                     this.radius = maxRadius * (1 - progress);
                     this.opacity = progress;
+                }
+            };
+            gameState.vfx.push(vfx);
+        }
+        
+        function createGroundAoeVFX(x, y, radius, color, duration, damage) {
+            const vfx = {
+                type: 'ground_aoe', x, y, radius, color,
+                opacity: 0.5,
+                damage: damage,
+                lastTick: 0,
+                tickRate: 500, // Damage every 0.5s
+                destroyTime: Date.now() + duration,
+                update: function(now) {
+                    if (now > this.lastTick + this.tickRate) {
+                        this.lastTick = now;
+                        for (const m of gameState.monsters) {
+                            if (Math.hypot(this.x - m.x, this.y - m.y) < this.radius) {
+                                m.currentHp -= this.damage;
+                                createDamageText(m, this.damage, this.color);
+                                if (m.currentHp <= 0) handleMonsterDeath(m, gameState.monsters.indexOf(m));
+                            }
+                        }
+                    }
+                    this.opacity = 0.3 + Math.sin((now / 200)) * 0.2; // Pulsing effect
                 }
             };
             gameState.vfx.push(vfx);
@@ -1187,57 +1309,93 @@
             const cooldownProgress = Math.min(1, (now - p.grenade.lastUsed) / p.grenade.cooldown);
             DOMElements.skillCooldownOverlay.style.clipPath = `inset(${100 - cooldownProgress * 100}% 0 0 0)`;
 
-            const currentStage = STAGES[gameState.stage];
-            if(currentStage) {
-                const kills = currentStage.bossActive ? currentStage.killsToAdvance : gameState.killCount;
-                DOMElements.stageProgress.style.width = `${(kills / currentStage.killsToAdvance) * 100}%`;
-                DOMElements.stageText.textContent = `STAGE ${gameState.stage + 1}`;
+            const currentStageData = STAGES[gameState.stage];
+            if(currentStageData) {
+                if (currentStageData.boss) {
+                    const boss = gameState.monsters.find(m => m.name === MONSTERS[currentStageData.boss].name);
+                    if (boss) {
+                        DOMElements.stageProgress.style.width = `${(boss.currentHp / boss.stats.hp) * 100}%`;
+                        DOMElements.stageText.textContent = `${boss.name.toUpperCase()}`;
+                    }
+                } else if (isFinite(currentStageData.duration)) {
+                    const elapsedTime = (now - gameState.stageStartTime) / 1000;
+                    DOMElements.stageProgress.style.width = `${(elapsedTime / currentStageData.duration) * 100}%`;
+                    DOMElements.stageText.textContent = `STAGE ${gameState.stage + 1}`;
+                } else {
+                    DOMElements.stageProgress.style.width = `100%`;
+                    DOMElements.stageText.textContent = `무한 모드`;
+                }
             }
         }
         
         function showLevelUpModal() {
             const p = gameState.player;
             const choices = [];
-            const existingWeapons = p.activeWeapons.map(w => w.id);
-            const newWeaponPool = UPGRADE_POOL.filter(wId => !existingWeapons.includes(wId));
             
-            let upgradeOptions = [];
-            p.activeWeapons.forEach(w => {
-                const weaponData = WEAPONS[w.id];
-                const maxLevel = weaponData.evolution.length > 0 ? Math.max(...weaponData.evolution.map(e => e.level)) : 1;
-                if (w.level < maxLevel) {
-                    upgradeOptions.push({ id: w.id, level: w.level, isNew: false });
-                }
-            });
-            if (newWeaponPool.length > 0 && p.activeWeapons.length < 6) {
-                 newWeaponPool.forEach(wId => {
-                     upgradeOptions.push({ id: wId, level: 0, isNew: true });
-                 });
-            }
+            const allWeaponsMaxed = p.activeWeapons.every(w => w.level >= WEAPONS[w.id].maxLevel);
 
-            while(choices.length < 3 && upgradeOptions.length > 0) {
-                const randIndex = Math.floor(Math.random() * upgradeOptions.length);
-                choices.push(upgradeOptions.splice(randIndex, 1)[0]);
+            if (allWeaponsMaxed && p.activeWeapons.length >= 4) {
+                // Offer stat upgrades
+                const statUpgrades = [
+                    { type: 'hp', text: '최대 체력 +10%', value: 0.1 },
+                    { type: 'power', text: '공격력 +5%', value: 0.05 },
+                    { type: 'speed', text: '이동 속도 +5%', value: 0.05 }
+                ];
+                // Shuffle and pick 3
+                for (let i = statUpgrades.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [statUpgrades[i], statUpgrades[j]] = [statUpgrades[j], statUpgrades[i]];
+                }
+                choices.push(...statUpgrades.slice(0, 3));
+            } else {
+                // Offer weapon upgrades
+                const existingWeapons = p.activeWeapons.map(w => w.id);
+                const newWeaponPool = UPGRADE_POOL.filter(wId => !existingWeapons.includes(wId));
+                
+                let upgradeOptions = [];
+                p.activeWeapons.forEach(w => {
+                    const weaponData = WEAPONS[w.id];
+                    if (w.level < weaponData.maxLevel) {
+                        upgradeOptions.push({ id: w.id, level: w.level, isNew: false });
+                    }
+                });
+                if (newWeaponPool.length > 0 && p.activeWeapons.length < 6) {
+                    newWeaponPool.forEach(wId => {
+                        upgradeOptions.push({ id: wId, level: 0, isNew: true });
+                    });
+                }
+
+                while(choices.length < 3 && upgradeOptions.length > 0) {
+                    const randIndex = Math.floor(Math.random() * upgradeOptions.length);
+                    choices.push(upgradeOptions.splice(randIndex, 1)[0]);
+                }
             }
 
             DOMElements.levelUpModal.innerHTML = `<div class="modal-panel">
                 <h2 class="modal-title">레벨 업!</h2>
                 <div class="grid grid-cols-1 gap-4">
                     ${choices.map(c => {
-                        const weaponData = WEAPONS[c.id];
-                        if (c.isNew) {
-                             return `<div class="upgrade-card" data-type="new" data-id="${c.id}">
-                                 <h3 class="font-bold text-lg text-green-400">새 무기: ${weaponData.name}</h3>
-                                 <p class="text-sm text-gray-400">${weaponData.description}</p>
+                        if (c.type) { // Stat upgrade
+                            return `<div class="upgrade-card" data-type="stat" data-stat="${c.type}" data-value="${c.value}">
+                                 <h3 class="font-bold text-lg text-green-400">${c.text}</h3>
+                                 <p class="text-sm text-gray-400">영구적인 능력치 강화</p>
                              </div>`;
-                        } else {
-                            const nextLevel = c.level + 1;
-                            const evolution = weaponData.evolution.find(e => e.level === nextLevel);
-                            return `<div class="upgrade-card" data-type="upgrade" data-id="${c.id}">
-                                 <h3 class="font-bold text-lg text-yellow-400">${weaponData.name} 강화</h3>
-                                 <p class="text-sm text-gray-400">Lv. ${c.level} -> Lv. ${nextLevel}</p>
-                                 ${evolution ? `<p class="text-sm text-cyan-400 mt-2">${evolution.description}</p>` : ''}
-                             </div>`;
+                        } else { // Weapon upgrade
+                            const weaponData = WEAPONS[c.id];
+                            if (c.isNew) {
+                                return `<div class="upgrade-card" data-type="new" data-id="${c.id}">
+                                    <h3 class="font-bold text-lg text-green-400">새 무기: ${weaponData.name}</h3>
+                                    <p class="text-sm text-gray-400">${weaponData.description}</p>
+                                </div>`;
+                            } else {
+                                const nextLevel = c.level + 1;
+                                const evolution = weaponData.evolution.find(e => e.level === nextLevel);
+                                return `<div class="upgrade-card" data-type="upgrade" data-id="${c.id}">
+                                    <h3 class="font-bold text-lg text-yellow-400">${weaponData.name} 강화</h3>
+                                    <p class="text-sm text-gray-400">Lv. ${c.level} -> Lv. ${nextLevel}</p>
+                                    ${evolution ? `<p class="text-sm text-cyan-400 mt-2">${evolution.description}</p>` : ''}
+                                </div>`;
+                            }
                         }
                     }).join('')}
                 </div>
@@ -1246,12 +1404,18 @@
             DOMElements.levelUpModal.querySelectorAll('.upgrade-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     const choiceType = e.currentTarget.dataset.type;
-                    const weaponId = e.currentTarget.dataset.id;
-                    if (choiceType === 'new') {
-                        p.activeWeapons.push({ id: weaponId, level: 1, lastFired: 0 });
+                    if (choiceType === 'stat') {
+                        const stat = e.currentTarget.dataset.stat;
+                        const value = parseFloat(e.currentTarget.dataset.value);
+                        p.statBonuses[stat] += value;
                     } else {
-                        const weaponToUpgrade = p.activeWeapons.find(w => w.id === weaponId);
-                        if(weaponToUpgrade) weaponToUpgrade.level++;
+                        const weaponId = e.currentTarget.dataset.id;
+                        if (choiceType === 'new') {
+                            p.activeWeapons.push({ id: weaponId, level: 1, lastFired: 0 });
+                        } else {
+                            const weaponToUpgrade = p.activeWeapons.find(w => w.id === weaponId);
+                            if(weaponToUpgrade) weaponToUpgrade.level++;
+                        }
                     }
                     recalculatePlayerStats();
                     DOMElements.levelUpModal.classList.add('hidden');
